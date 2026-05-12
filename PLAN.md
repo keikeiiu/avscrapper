@@ -1,120 +1,136 @@
-# FC2 Automated Scraper + NFO Enricher Plan
+# FC2 Scraper — Updated Plan (Multi-Site)
 
 ## Context
 
-Previously, 304 FC2 videos had their metadata manually scraped from `fc2ppvdb.com` using Browser MCP (one-by-one navigation) and NFOs were enriched via `enrich_nfos.js`. This needs to become an **automated, repeatable tool** in `avscrappertools/` with **separated scraper and enricher processes** communicating through SQLite.
+Building HTTP scrapers for FC2PPV metadata. No `MDC-FIX` repo on this PC — all parsing built from scratch with `requests` + `lxml`. Cookie-based auth. No MP4 files on this PC, so **scraper + DB only** — enricher comes later.
 
-Architecture discussed with Gemini: Python for scraper (AI-friendly, reuses MDC-FIX), SQLite as shared DB, separation of "scrape to DB" and "DB to NFO" phases.
+Key design requirement: **each website gets its own scraper module**. `fc2ppvdb_scraper.py` targets fc2ppvdb.com specifically. Future sites (fc2hub, dmm, etc.) add new modules without touching shared infrastructure.
 
-## Architecture
+## Architecture (Multi-Site)
 
 ```
-[FC2 directories] → fc2_scraper.py → HTTP(+cookie) → fc2ppvdb.com
-                                ↓
-                           fc2_data.db (SQLite)
-                                ↓
-[FC2 directories] → fc2_enricher.py → NFO files + report.md
+avscrappertools/
+├── fc2_config.yaml              # Config with per-site sections
+├── fc2_db.py                    # Shared SQLite layer (schema + CRUD for all sites)
+├── fc2_nfo.py                   # Shared NFO XML parse/build/write
+├── requirements.txt             # pyyaml, requests, lxml
+├── scrapers/
+│   ├── __init__.py
+│   ├── base.py                  # BaseScraper: session, rate-limit, DB writes, CLI dispatch
+│   └── fc2ppvdb_scraper.py      # fc2ppvdb.com parser + site-specific logic
+└── F-drive-FC2-list.md
 ```
 
-**Language: Python-only** — reuses the existing `MDC-FIX/scrapinglib/fc2ppvdb.py` which already has all XPath expressions and cookie support.
+**Shared layer** (`fc2_db.py`, `fc2_nfo.py`, `fc2_config.yaml`): one schema, one config file, one NFO format. All scrapers write to the same `fc2_data.db`.
 
-## Files to Create (all in `avscrappertools/`)
+**Site scrapers** (`scrapers/*.py`): each inherits `BaseScraper`, implements `search(cid) → dict`. Only responsible for HTTP + HTML parsing for their target site.
 
-| File | Purpose | ~Lines |
-|------|---------|--------|
-| `fc2_config.yaml` | Config: scan dirs, cookie, DB path, rate limit, MDC-FIX path | 25 |
-| `config.ini` | Minimal MDC-FIX config (required by its Config() loader) | 50 |
-| `fc2_db.py` | SQLite schema + CRUD: init, upsert_entry, upsert_file, get_pending, get_scraped, update_status | 110 |
-| `fc2_scraper.py` | CLI: scan dirs → insert pending → scrape FC2PPVDB → save to DB | 220 |
-| `fc2_enricher.py` | CLI: read scraped from DB → merge with existing NFO → write NFO → report | 250 |
-| `fc2_nfo.py` | NFO XML parse/build/write using xml.etree.ElementTree | 80 |
-| `fc2_mp4.py` | MP4 duration parser (port get_durations.js moov/mvhd atom parsing to Python struct) | 70 |
-| `fc2_reporter.py` | Markdown audit report generation | 70 |
+## Files to Create (7 files, ~530 lines)
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `fc2_config.yaml` | Per-site config: cookies, UA, delays, scan dirs, DB path | ~30 |
 | `requirements.txt` | pyyaml, requests, lxml | 3 |
+| `fc2_db.py` | SQLite schema + CRUD (init, upsert_entry, get_pending, etc.) | ~110 |
+| `fc2_nfo.py` | NFO XML parse/build/write (scaffold for future enricher) | ~80 |
+| `scrapers/__init__.py` | Package init, scraper registry | ~10 |
+| `scrapers/base.py` | BaseScraper: session, rate-limit, anti-ban headers, DB write helpers, CLI arg parsing | ~150 |
+| `scrapers/fc2ppvdb_scraper.py` | fc2ppvdb.com: search URL, HTML selectors, parse logic | ~150 |
 
-## SQLite Schema
+**Deferred** (no MP4 files): `fc2_enricher.py`, `fc2_mp4.py`, `fc2_reporter.py`
 
-**`fc2_entries`** — one row per FC2 ID:
-- `cid` TEXT PK (bare number, e.g. "3173579")
-- `full_number` TEXT ("FC2-PPV-3173579")
-- `title`, `seller`, `actress`, `release_date`, `duration`, `duration_seconds`
-- `cover_url`, `tags` (JSON array), `outline`, `url`, `mosaic`
-- `status` TEXT: `pending` → `scraped` → `nfo_done` | `404` | `error`
-- `error_message` TEXT, `scraped_at` TEXT, `raw_json` TEXT
+## BaseScraper Design (`scrapers/base.py`)
 
-**`fc2_files`** — one row per MP4 file:
-- `id` INTEGER PK auto
-- `cid` TEXT FK → fc2_entries
-- `directory_path`, `file_path`, `file_size`
-- `duration_seconds` REAL, `duration_str` TEXT
-- `part_number` INTEGER DEFAULT 1
+Abstract base class that handles everything site-agnostic:
 
-## Key Design Decisions
-
-1. **Import MDC-FIX, don't copy**: `sys.path.insert(0, config.mdcfix_path)` then `from scrapinglib.api import Scraping`. Reuses battle-tested XPath expressions. If fc2ppvdb.com changes, fix once in MDC-FIX.
-
-2. **Scraper uses `Scraping().search()` not `Fc2ppvdb()` directly**: The `Scraping` orchestrator properly wires `fc2cookies` through `updateCore()`. Without it, the cookie dict never reaches the HTTP request.
-
-3. **Cookie**: `all_age_verification_check=1` passed as `fc2cookies` dict.
-
-4. **Rate limiting**: `scrape_delay_seconds: 3` between entries (MDC-FIX already has built-in 3s retry delay).
-
-5. **Cover preservation**: Enricher NEVER overwrites existing `<cover>`. Tags are merged additively.
-
-6. **Multi-part detection**: Regex `[-_]?(?:part?|pt)(\d+)` before `.mp4`. One DB entry per CID, multiple `fc2_files` rows. Duration audit sums all parts.
-
-7. **Date normalization**: `YYYY/MM/DD` → `YYYY-MM-DD`.
-
-## Data Flow
-
-### Scraper (`fc2_scraper.py`)
 ```
-1. Load config.yaml
-2. If --ids: use those; else: scan all configured directories
-3. Parse dir names → extract CID, detect multi-part, find MP4s
-4. INSERT OR IGNORE into fc2_entries (status='pending'), INSERT into fc2_files
-5. For each pending entry:
-   a. Call Scraping().search(cid, sources='fc2ppvdb', fc2cookies={...})
-   b. Parse returned JSON → upsert fc2_entries (status='scraped' or '404')
-   c. Parse MP4 durations via fc2_mp4 → update fc2_files
-   d. Sleep(scrape_delay_seconds)
-6. Print summary
+class BaseScraper:
+    def __init__(self, config_section)      # Load site config from fc2_config.yaml
+    def _init_session(self)                  # requests.Session with UA, cookies, headers
+    def _rate_limit(self)                    # Sleep scrape_delay_seconds, backoff on 429
+    def search(self, cid) -> dict            # ABSTRACT: site implements HTTP GET + parse
+    def scrape_pending(self, db)             # Loop: get pending from DB → search() → upsert
+    def run(self, args)                      # CLI entry: parse args, dispatch
 ```
 
-### Enricher (`fc2_enricher.py`)
+Each site scraper only needs to implement `search(cid)`:
+1. HTTP GET to site's search/display URL
+2. Parse HTML with `lxml.cssselect`
+3. Return dict of {title, seller, actress, tags, release_date, cover_url, outline, ...}
+
+## SQLite Schema (same as original, shared across all sites)
+
+**`fc2_entries`**: `cid` TEXT PK, `full_number`, `title`, `seller`, `actress`, `release_date`, `duration`, `duration_seconds`, `cover_url`, `tags` (JSON), `outline`, `url`, `source` (site name, e.g. "fc2ppvdb"), `mosaic`, `status` (pending→scraped | 404 | error), `error_message`, `scraped_at`, `raw_json`
+
+**`fc2_files`**: `id` PK auto, `cid` FK, `directory_path`, `file_path`, `file_size`, `duration_seconds`, `duration_str`, `part_number`
+
+Added `source` column to track which site provided the data — useful when multiple scrapers exist.
+
+## fc2ppvdb.com Parsing
+
+Target URL: `https://fc2ppvdb.com/search?q={cid}` → redirects to video page.
+
+Parsing approach: use `lxml` CSS selectors against known page structure. Validate with known ID `409694`. Key targets:
+- Title, seller, actress, tags, release date, duration, cover URL, outline
+
+## Config Structure (`fc2_config.yaml`)
+
+```yaml
+db_path: "fc2_data.db"
+scan_directories: []  # populated when F-drive is available
+
+sites:
+  fc2ppvdb:
+    base_url: "https://fc2ppvdb.com"
+    scrape_delay_seconds: 3
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/135.0"
+    cookies:
+      all_age_verification_check: "1"
+      # add session cookies after login
 ```
-1. Load config.yaml
-2. Query fc2_entries WHERE status='scraped' (or specific --ids)
-3. For each entry:
-   a. Find directory on disk (search scan dirs)
-   b. Read existing NFO via fc2_nfo.parse_nfo()
-   c. Merge: title, studio, tags, premiered, website (NEVER cover)
-   d. If changed: write NFO, update status='nfo_done'
-4. Generate markdown report
-```
+
+## Anti-Ban Measures
+
+1. Per-site `scrape_delay_seconds` (default 3s)
+2. Real browser User-Agent per site
+3. `Referer` header set to site base URL
+4. Single `requests.Session` reused across all requests
+5. Exponential backoff on 429 (30s/60s/120s)
+6. Resume-safe: only scrape `status='pending'` rows
+
+## Cookie Acquisition
+
+Browser MCP configured (`@browsermcp/mcp@latest`). Will try:
+1. Browser MCP: navigate → user logs in → extract cookies → write to yaml
+2. Fallback: DevTools manual copy
 
 ## CLI Usage
 
 ```bash
-python fc2_scraper.py                        # Scrape all pending
-python fc2_scraper.py --ids 3173579,409694   # Scrape specific IDs
-python fc2_scraper.py --retry-errors         # Retry failed
-python fc2_enricher.py                       # Enrich all scraped
-python fc2_enricher.py --dry-run             # Preview changes
-python fc2_enricher.py --ids 3173579,409694  # Enrich specific IDs
+# Via fc2ppvdb_scraper.py directly:
+python scrapers/fc2ppvdb_scraper.py                          # Scrape all pending
+python scrapers/fc2ppvdb_scraper.py --ids 409694,3173579     # Test specific IDs
+python scrapers/fc2ppvdb_scraper.py --ids-file ../../F-drive-FC2-list.md
+python scrapers/fc2ppvdb_scraper.py --retry-errors
+python scrapers/fc2ppvdb_scraper.py --delay 5 --dry-run
+
+# Future: single dispatcher that routes to correct scraper by source
 ```
 
 ## Implementation Order
 
-1. **Foundation**: `fc2_config.yaml`, `config.ini`, `fc2_db.py`, `fc2_nfo.py`, `fc2_mp4.py`, `requirements.txt`
-2. **Scraper**: `fc2_scraper.py` — scan + scrape + DB persistence
-3. **Enricher**: `fc2_enricher.py` + `fc2_reporter.py` — NFO merge + write + report
-4. **Integration test**: Run full pipeline against 10 IDs, verify NFO output
+1. **`fc2_config.yaml`** — config template with fc2ppvdb section
+2. **`requirements.txt`** — pyyaml, requests, lxml
+3. **`fc2_db.py`** — SQLite schema + CRUD
+4. **`scrapers/__init__.py`** — package init, registry
+5. **`scrapers/base.py`** — BaseScraper with all shared logic
+6. **`scrapers/fc2ppvdb_scraper.py`** — fc2ppvdb.com parser
+7. **`fc2_nfo.py`** — scaffold (for future enricher)
 
 ## Verification
 
-1. `python fc2_scraper.py --ids 409694` (known working ID) → DB has status='scraped'
-2. `python fc2_enricher.py --ids 409694 --dry-run` → merge logic correct
-3. `python fc2_enricher.py --ids 409694` → NFO written, cover preserved
-4. `python fc2_scraper.py --ids 999999999999` (fake ID) → status='404'
-5. Test multi-part ID → part detection + duration summation work
+1. `python scrapers/fc2ppvdb_scraper.py --ids 409694` → DB has status='scraped', real data
+2. `python scrapers/fc2ppvdb_scraper.py --ids 999999999999` → status='404'
+3. `sqlite3 fc2_data.db "SELECT source, status, COUNT(*) FROM fc2_entries GROUP BY source, status"` → correct counts
+4. 5 IDs complete in < 20s (3s delay x 5 + overhead)
+5. Adding a future site = new file in `scrapers/` + config section, no other files touched

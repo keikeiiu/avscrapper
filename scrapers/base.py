@@ -1,0 +1,185 @@
+"""Base class for site scrapers — handles CLI, rate-limiting, DB writes."""
+
+import time
+import sys
+import os
+import argparse
+from abc import ABC, abstractmethod
+
+
+class BaseScraper(ABC):
+    def __init__(self, site_config):
+        self.base_url = site_config["base_url"].rstrip("/")
+        self.delay = site_config.get("scrape_delay_seconds", 3)
+        self.user_agent = site_config.get("user_agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0")
+        self.cookies = site_config.get("cookies", {})
+        self.source = site_config.get("source", "unknown")
+        self._consecutive_429 = 0
+        self.setup()
+
+    def setup(self):
+        """Override to initialise transport (browser, session, etc)."""
+
+    def teardown(self):
+        """Override to clean up transport."""
+
+    def _rate_limit(self):
+        backoff = min(120, self.delay * (2 ** self._consecutive_429))
+        time.sleep(backoff)
+        self._consecutive_429 = max(0, self._consecutive_429 - 1)
+
+    @abstractmethod
+    def search(self, cid):
+        """Fetch and parse metadata for a CID. Returns dict or None on 404."""
+        ...
+
+    def scrape_pending(self, db_path, cids=None, retry_errors=False, dry_run=False):
+        """Main loop: scrape pending (or specified) CIDs and write to DB."""
+        from fc2_db import connect, init_db, insert_pending, upsert_scraped, mark_status, get_pending, get_errors
+
+        init_db(db_path)
+        conn = connect(db_path)
+
+        if cids:
+            entries = [{"cid": c, "full_number": f"FC2-PPV-{c}"} for c in cids]
+            for e in entries:
+                insert_pending(conn, e["cid"], e["full_number"], self.source)
+        elif retry_errors:
+            entries = get_errors(conn, source=self.source)
+        else:
+            entries = get_pending(conn, source=self.source)
+
+        if not entries:
+            print(f"No pending entries for source '{self.source}'. Nothing to scrape.")
+            conn.close()
+            return
+
+        total = len(entries)
+        print(f"Scraping {total} entries from {self.source} (delay={self.delay}s)...")
+        if dry_run:
+            print("[DRY RUN -- no DB writes]")
+
+        scraped = 0
+        not_found = 0
+        errors = 0
+
+        try:
+            for i, entry in enumerate(entries):
+                cid = entry["cid"]
+                print(f"[{i+1}/{total}] {cid} ... ", end="", flush=True)
+
+                if dry_run:
+                    print("SKIP (dry-run)")
+                    continue
+
+                try:
+                    data = self.search(cid)
+                except Exception as e:
+                    mark_status(conn, cid, "error", str(e)[:500])
+                    print(f"ERROR: {e}")
+                    errors += 1
+                    self._rate_limit()
+                    continue
+
+                if data is None:
+                    mark_status(conn, cid, "404")
+                    print("404")
+                    not_found += 1
+                else:
+                    upsert_scraped(conn, cid, data, self.source)
+                    status = data.get("title", "OK")[:60]
+                    print(status)
+                    scraped += 1
+
+                self._rate_limit()
+        finally:
+            conn.close()
+            self.teardown()
+
+        print(f"\nDone: {scraped} scraped, {not_found} not found, {errors} errors")
+
+    @classmethod
+    def build_argparser(cls):
+        p = argparse.ArgumentParser(description=f"{cls.__name__} scraper")
+        p.add_argument("--ids", help="Comma-separated CIDs to scrape")
+        p.add_argument("--ids-file", help="File with one CID per line (or markdown list)")
+        p.add_argument("--retry-errors", action="store_true", help="Retry entries with status=error or 404")
+        p.add_argument("--delay", type=int, help="Override scrape delay in seconds")
+        p.add_argument("--dry-run", action="store_true", help="Show what would be scraped without DB writes")
+        p.add_argument("--seed-only", action="store_true", help="Insert CIDs as pending, then exit (no scraping)")
+        return p
+
+    @staticmethod
+    def parse_ids_from_file(filepath):
+        import re
+        cids = []
+        with open(filepath) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or line.startswith("```"):
+                    continue
+                if line.startswith("|") or line.startswith("-"):
+                    continue
+                matches = re.findall(r'\b(\d{6,8})\b', line)
+                cids.extend(matches)
+        return cids
+
+    @classmethod
+    def run(cls, site_name, argv=None):
+        """Standard CLI entry: load config, create scraper, scrape.
+
+        Args:
+            site_name: key in config['sites'] (e.g. 'fc2ppvdb')
+            argv: CLI args (defaults to sys.argv[1:])
+        """
+        import yaml
+
+        if argv is None:
+            argv = sys.argv[1:]
+
+        parser = cls.build_argparser()
+        args = parser.parse_args(argv)
+
+        config_path = os.environ.get(
+            "FC2_CONFIG",
+            os.path.join(os.path.dirname(__file__), "..", "fc2_config.yaml"),
+        )
+        config_path = os.path.normpath(config_path)
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+
+        site_config = config["sites"][site_name]
+        site_config["source"] = site_name
+
+        if args.delay:
+            site_config["scrape_delay_seconds"] = args.delay
+
+        cids = None
+        if args.ids:
+            cids = [c.strip() for c in args.ids.split(",") if c.strip()]
+        elif args.ids_file:
+            cids = cls.parse_ids_from_file(args.ids_file)
+
+        if args.seed_only:
+            from fc2_db import connect, init_db, insert_pending
+
+            init_db(config.get("db_path", "fc2_data.db"))
+            conn = connect(config.get("db_path", "fc2_data.db"))
+            if cids:
+                for c in cids:
+                    insert_pending(conn, c, f"FC2-PPV-{c}", site_name)
+                print(f"Seeded {len(cids)} CIDs as pending.")
+            else:
+                print("No CIDs provided (use --ids or --ids-file).")
+            conn.close()
+            return
+
+        scraper = cls(site_config)
+
+        scraper.scrape_pending(
+            db_path=config.get("db_path", "fc2_data.db"),
+            cids=cids,
+            retry_errors=args.retry_errors,
+            dry_run=args.dry_run,
+        )
