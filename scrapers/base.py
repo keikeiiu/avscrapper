@@ -60,7 +60,7 @@ class BaseScraper(ABC):
 
     def scrape_pending(self, db_path, cids=None, retry_errors=False, dry_run=False):
         """Main loop: scrape pending (or specified) CIDs and write to DB."""
-        from fc2_db import connect, init_db, insert_pending, upsert_scraped, mark_status, get_pending, get_errors
+        from db import connect, init_db, insert_pending, upsert_scraped, mark_status, get_pending, get_errors
 
         init_db(db_path)
         conn = connect(db_path)
@@ -186,7 +186,7 @@ class BaseScraper(ABC):
             cids = cls.parse_ids_from_file(args.ids_file)
 
         if args.seed_only:
-            from fc2_db import connect, init_db, insert_pending
+            from db import connect, init_db, insert_pending
 
             init_db(config.get("db_path", "fc2_data.db"))
             conn = connect(config.get("db_path", "fc2_data.db"))

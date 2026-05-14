@@ -5,7 +5,7 @@ import os
 import re
 import argparse
 import yaml
-from fc2_db import connect, get_scraped, mark_status
+from db import connect, get_scraped, mark_status
 from fc2_nfo import parse_nfo, build_nfo, merge_fields
 
 

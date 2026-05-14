@@ -152,5 +152,41 @@ FC2-PPV-3173579[UNCENSORED]/
 ## Verification
 
 1. `python scrapers/fc2ppvdb_scraper.py --ids 409694` → scraped OK
-2. `python fc2_enricher.py --ids 409694` → `movie.nfo` in folder, old NFO cleaned up
+2. `python fc2_enricher.py --ids 409694` → `FC2-PPV-409694.nfo` in folder
 3. `sqlite3 fc2_data.db "SELECT status, COUNT(*) FROM fc2_entries GROUP BY status"` → correct counts
+
+---
+
+# JavDB Scraper + JAV NFO (Next Phase)
+
+## Context
+
+JAV metadata is richer than FC2 — series, label, director, multiple actors with photos, ratings. JavDB.com is the community standard. Unprocessed JAV files at `F:/AV/Japanese/JAV/_Unprocessed/`.
+
+## New Components
+
+| File | Purpose |
+|------|---------|
+| `db.py` | Rename from `fc2_db.py`, add `jav_entries` + `jav_files` tables |
+| `config.yaml` | Rename from `fc2_config.yaml`, add `javdb:` section |
+| `scrapers/javdb_scraper.py` | JavDB Playwright scraper |
+| `jav_nfo.py` | JAV Kodi NFO: series, label, director, actors with thumbs, rating |
+| `jav_enricher.py` | JAV NFO enricher |
+
+## JAV NFO Fields
+
+`<title>`, `<originaltitle>`, `<sorttitle>`, `<uniqueid type="jav">`, `<plot>`, `<studio>`, `<label>`, `<series>`, `<director>`, `<premiered>`, `<year>`, `<runtime>`, `<genre>`, `<actor><name><thumb>`, `<rating>`, `<votes>`, `<art><poster><fanart>`
+
+## JavDB Auth
+
+- Public: `over18: 1` cookie
+- Full: `_jdb_session` + `remember_me_token` (login)
+
+## Implementation Order
+
+1. Rename `fc2_db.py` → `db.py`, add JAV tables
+2. Rename `fc2_config.yaml` → `config.yaml`
+3. Update imports across all files
+4. `jav_nfo.py` builder
+5. `scrapers/javdb_scraper.py`
+6. `jav_enricher.py`
