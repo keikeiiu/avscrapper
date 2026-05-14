@@ -4,7 +4,9 @@
 db_path: "fc2_data.db"
 
 # Directories to scan for FC2 video files (populated when F-drive available)
-scan_directories: []
+scan_directories:
+  - "C:/Users/keiwa/Downloads/_AV/FC2"
+  - "F:/AV/Japanese/FC2"
 
 # Per-site scraper configuration
 sites:
