@@ -1,16 +1,36 @@
 """Base class for site scrapers — handles CLI, rate-limiting, DB writes."""
 
 import time
+import random
 import sys
 import os
 import argparse
 from abc import ABC, abstractmethod
 
 
+def _parse_delay(value):
+    """Parse delay spec: '5' → 5, '5-20' → (5, 20), tuple passes through."""
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, (tuple, list)):
+        return (float(value[0]), float(value[1]))
+    if isinstance(value, str) and "-" in value:
+        parts = value.split("-", 1)
+        return (float(parts[0]), float(parts[1]))
+    return float(value)
+
+
+def _delay_str(delay):
+    if isinstance(delay, tuple):
+        return f"{delay[0]}-{delay[1]}s (random)"
+    return f"{delay}s"
+
+
 class BaseScraper(ABC):
     def __init__(self, site_config):
         self.base_url = site_config["base_url"].rstrip("/")
-        self.delay = site_config.get("scrape_delay_seconds", 3)
+        raw_delay = site_config.get("scrape_delay_seconds", 3)
+        self.delay = _parse_delay(raw_delay)
         self.user_agent = site_config.get("user_agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0")
         self.cookies = site_config.get("cookies", {})
@@ -25,8 +45,12 @@ class BaseScraper(ABC):
         """Override to clean up transport."""
 
     def _rate_limit(self):
-        backoff = min(120, self.delay * (2 ** self._consecutive_429))
-        time.sleep(backoff)
+        if isinstance(self.delay, tuple):
+            d = random.uniform(self.delay[0], self.delay[1])
+        else:
+            d = self.delay
+        d = min(120, d * (2 ** self._consecutive_429))
+        time.sleep(d)
         self._consecutive_429 = max(0, self._consecutive_429 - 1)
 
     @abstractmethod
@@ -56,7 +80,7 @@ class BaseScraper(ABC):
             return
 
         total = len(entries)
-        print(f"Scraping {total} entries from {self.source} (delay={self.delay}s)...")
+        print(f"Scraping {total} entries from {self.source} (delay={_delay_str(self.delay)})...")
         if dry_run:
             print("[DRY RUN -- no DB writes]")
 
@@ -88,7 +112,7 @@ class BaseScraper(ABC):
                     not_found += 1
                 else:
                     upsert_scraped(conn, cid, data, self.source)
-                    status = data.get("title", "OK")[:60]
+                    status = (data.get("title") or "OK")[:60]
                     print(status)
                     scraped += 1
 
@@ -105,7 +129,7 @@ class BaseScraper(ABC):
         p.add_argument("--ids", help="Comma-separated CIDs to scrape")
         p.add_argument("--ids-file", help="File with one CID per line (or markdown list)")
         p.add_argument("--retry-errors", action="store_true", help="Retry entries with status=error or 404")
-        p.add_argument("--delay", type=int, help="Override scrape delay in seconds")
+        p.add_argument("--delay", type=str, help="Scrape delay in seconds or range 'min-max' (e.g. '5-20')")
         p.add_argument("--dry-run", action="store_true", help="Show what would be scraped without DB writes")
         p.add_argument("--seed-only", action="store_true", help="Insert CIDs as pending, then exit (no scraping)")
         return p
@@ -153,7 +177,7 @@ class BaseScraper(ABC):
         site_config["source"] = site_name
 
         if args.delay:
-            site_config["scrape_delay_seconds"] = args.delay
+            site_config["scrape_delay_seconds"] = _parse_delay(args.delay)
 
         cids = None
         if args.ids:
