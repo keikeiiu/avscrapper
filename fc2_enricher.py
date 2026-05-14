@@ -72,20 +72,18 @@ def enrich(scan_dirs, db_path, cids=None, dry_run=False):
             no_dir += 1
             continue
 
-        # Find existing NFO or pick default name
-        nfo_path = None
-        for fname in os.listdir(dir_path):
-            if fname.endswith(".nfo"):
-                nfo_path = os.path.join(dir_path, fname)
-                break
-        if not nfo_path:
-            nfo_path = os.path.join(dir_path, f"FC2-PPV-{cid}.nfo")
+        nfo_path = os.path.join(dir_path, f"FC2-PPV-{cid}.nfo")
 
+        # Read existing NFO data (any .nfo in folder)
         existing_fields = {}
         existing_tags = []
         existing_art = {}
-        if os.path.exists(nfo_path):
-            existing_fields, existing_tags, existing_art = parse_nfo(nfo_path)
+        for fname in os.listdir(dir_path):
+            if fname.endswith(".nfo"):
+                fpath = os.path.join(dir_path, fname)
+                if os.path.exists(fpath):
+                    existing_fields, existing_tags, existing_art = parse_nfo(fpath)
+                break
 
         raw_title = entry.get("title") or ""
         scraped = {
@@ -131,6 +129,13 @@ def enrich(scan_dirs, db_path, cids=None, dry_run=False):
         os.makedirs(dir_path, exist_ok=True)
         with open(nfo_path, "w", encoding="utf-8") as f:
             f.write(xml)
+
+        # Remove old NFO files with different names
+        target = f"FC2-PPV-{cid}.nfo"
+        for fname in os.listdir(dir_path):
+            if fname.endswith(".nfo") and fname != target:
+                os.remove(os.path.join(dir_path, fname))
+
         print(f"[{i+1}/{total}] {cid}: written")
         report_lines.append(f"| {cid} | yes | updated |")
         updated += 1

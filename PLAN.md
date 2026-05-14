@@ -1,5 +1,12 @@
 # FC2 Scraper — Updated Plan (Multi-Site)
 
+## Status
+- ✅ Scraper (`scrapers/fc2ppvdb_scraper.py`) — working, Playwright-based
+- ✅ Kodi NFO (`fc2_nfo.py`) — standard fields, merge logic
+- ✅ Enricher (`fc2_enricher.py`) — writes `movie.nfo` per folder
+- ⬜ Duration audit — deferred (no MP4 access)
+- ⬜ Video renaming — deferred
+
 ## Context
 
 Building HTTP scrapers for FC2PPV metadata. No `MDC-FIX` repo on this PC — all parsing built from scratch with `requests` + `lxml`. Cookie-based auth. No MP4 files on this PC, so **scraper + DB only** — enricher comes later.
@@ -117,20 +124,33 @@ python scrapers/fc2ppvdb_scraper.py --delay 5 --dry-run
 # Future: single dispatcher that routes to correct scraper by source
 ```
 
+## Enricher NFO Naming
+
+Always `FC2-PPV-{cid}.nfo` per folder. Kodi/Jellyfin auto-detect multi-part from file suffixes.
+
+```
+FC2-PPV-409694/
+  └── FC2-PPV-409694.nfo
+
+FC2-PPV-3173579[UNCENSORED]/
+  ├── FC2-PPV-3173579-pt1.mp4
+  ├── FC2-PPV-3173579-pt2.mp4
+  └── FC2-PPV-3173579.nfo          ← one NFO covers all parts
+```
+
 ## Implementation Order
 
-1. **`fc2_config.yaml`** — config template with fc2ppvdb section
-2. **`requirements.txt`** — pyyaml, requests, lxml
-3. **`fc2_db.py`** — SQLite schema + CRUD
-4. **`scrapers/__init__.py`** — package init, registry
-5. **`scrapers/base.py`** — BaseScraper with all shared logic
-6. **`scrapers/fc2ppvdb_scraper.py`** — fc2ppvdb.com parser
-7. **`fc2_nfo.py`** — scaffold (for future enricher)
+1. ✅ `fc2_config.yaml` — config with cookies, delays, scan dirs
+2. ✅ `requirements.txt` — pyyaml, playwright
+3. ✅ `fc2_db.py` — SQLite schema + CRUD
+4. ✅ `scrapers/base.py` — BaseScraper framework
+5. ✅ `scrapers/fc2ppvdb_scraper.py` — Playwright scraper
+6. ✅ `fc2_nfo.py` — Kodi-standard NFO builder
+7. ✅ `fc2_enricher.py` — writes `movie.nfo` per folder
+8. ⬜ Duration audit (deferred, no MP4 access)
 
 ## Verification
 
-1. `python scrapers/fc2ppvdb_scraper.py --ids 409694` → DB has status='scraped', real data
-2. `python scrapers/fc2ppvdb_scraper.py --ids 999999999999` → status='404'
-3. `sqlite3 fc2_data.db "SELECT source, status, COUNT(*) FROM fc2_entries GROUP BY source, status"` → correct counts
-4. 5 IDs complete in < 20s (3s delay x 5 + overhead)
-5. Adding a future site = new file in `scrapers/` + config section, no other files touched
+1. `python scrapers/fc2ppvdb_scraper.py --ids 409694` → scraped OK
+2. `python fc2_enricher.py --ids 409694` → `movie.nfo` in folder, old NFO cleaned up
+3. `sqlite3 fc2_data.db "SELECT status, COUNT(*) FROM fc2_entries GROUP BY status"` → correct counts
