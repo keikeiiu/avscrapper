@@ -2,10 +2,23 @@
 
 import sys
 import os
+import re
 import argparse
 import yaml
 from fc2_db import connect, get_scraped, mark_status
 from fc2_nfo import parse_nfo, build_nfo, merge_fields
+
+
+def _parse_runtime_minutes(dur):
+    """Convert HH:MM:SS or MM:SS string to integer minutes."""
+    if not dur:
+        return None
+    parts = dur.strip().split(":")
+    if len(parts) == 3:
+        return int(parts[0]) * 60 + int(parts[1])
+    elif len(parts) == 2:
+        return int(parts[0])
+    return None
 
 
 def find_directories(scan_dirs):
@@ -53,31 +66,47 @@ def enrich(scan_dirs, db_path, cids=None, dry_run=False):
     for i, entry in enumerate(entries):
         cid = entry["cid"]
         dir_path = cid_dirs.get(cid)
-        nfo_path = os.path.join(dir_path, f"FC2-PPV-{cid}.nfo") if dir_path else None
-
         if not dir_path:
             print(f"[{i+1}/{total}] {cid}: no directory")
             report_lines.append(f"| {cid} | no | skipped |")
             no_dir += 1
             continue
 
+        # Find existing NFO or pick default name
+        nfo_path = None
+        for fname in os.listdir(dir_path):
+            if fname.endswith(".nfo"):
+                nfo_path = os.path.join(dir_path, fname)
+                break
+        if not nfo_path:
+            nfo_path = os.path.join(dir_path, f"FC2-PPV-{cid}.nfo")
+
         existing_fields = {}
         existing_tags = []
-        if nfo_path and os.path.exists(nfo_path):
-            existing_fields, existing_tags = parse_nfo(nfo_path)
+        existing_art = {}
+        if os.path.exists(nfo_path):
+            existing_fields, existing_tags, existing_art = parse_nfo(nfo_path)
 
+        raw_title = entry.get("title") or ""
         scraped = {
-            "title": f"FC2-PPV-{cid} {entry['title']}" if entry["title"] else None,
+            "title": f"FC2-PPV-{cid} {raw_title}",
+            "originaltitle": raw_title,
+            "sorttitle": f"FC2-PPV-{cid}",
+            "uniqueid": cid,
             "num": f"FC2-PPV-{cid}",
-            "outline": entry.get("title"),
-            "plot": entry.get("title"),
+            "plot": raw_title,
             "studio": entry.get("seller"),
             "genre": "FC2",
             "premiered": entry.get("release_date"),
-            "cover": None,  # never set — merge_fields preserves existing
+            "runtime": _parse_runtime_minutes(entry.get("duration")),
             "website": entry.get("url") or f"https://fc2ppvdb.com/articles/{cid}",
         }
-        scraped = {k: v for k, v in scraped.items() if v is not None}
+        scraped = {k: v for k, v in scraped.items() if v is not None and v != ""}
+
+        # Art: use scraped cover_url if no existing poster
+        cover_url = entry.get("cover_url")
+        if cover_url and "poster" not in existing_art:
+            existing_art["poster"] = cover_url
 
         merged = merge_fields(existing_fields, scraped)
         actress = entry.get("actress", "")
@@ -98,9 +127,9 @@ def enrich(scan_dirs, db_path, cids=None, dry_run=False):
                 skipped += 1
             continue
 
-        xml = build_nfo(merged, existing_tags)
+        xml = build_nfo(merged, existing_tags, existing_art)
         os.makedirs(dir_path, exist_ok=True)
-        with open(os.path.join(dir_path, f"FC2-PPV-{cid}.nfo"), "w", encoding="utf-8") as f:
+        with open(nfo_path, "w", encoding="utf-8") as f:
             f.write(xml)
         print(f"[{i+1}/{total}] {cid}: written")
         report_lines.append(f"| {cid} | yes | updated |")
