@@ -184,9 +184,9 @@ JAV metadata is richer than FC2 — series, label, director, multiple actors wit
 
 ## Implementation Order
 
-1. Rename `fc2_db.py` → `db.py`, add JAV tables
-2. Rename `fc2_config.yaml` → `config.yaml`
-3. Update imports across all files
-4. `jav_nfo.py` builder
-5. `scrapers/javdb_scraper.py`
-6. `jav_enricher.py`
+1. ✅ Rename `fc2_db.py` → `db.py`, add JAV tables
+2. ⬜ Rename `fc2_config.yaml` → `config.yaml`
+3. ✅ Update imports across all files
+4. ⬜ `jav_nfo.py` builder
+5. ⬜ `scrapers/javdb_scraper.py`
+6. ⬜ `jav_enricher.py`
