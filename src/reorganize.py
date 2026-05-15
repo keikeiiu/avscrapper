@@ -164,7 +164,8 @@ def reorganize(config_path, dry_run=False, cids=None):
 
 def _fc2_extractor(name):
     if name.startswith("FC2-PPV-"):
-        return name.replace("FC2-PPV-", "").split("[")[0].strip()
+        m = re.match(r'FC2-PPV-(\d{6,8})', name)
+        return m.group(1) if m else None
     return None
 
 
