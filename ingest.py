@@ -113,17 +113,17 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     # Auto-assign part numbers for duplicate CIDs without explicit markers
     _assign_parts(results)
 
-    # Phase 1: always preview
-    print(f"Found {len(files)} files in {source}\n")
+    # Phase 1: compute plan
     to_move = 0
     to_skip = 0
     to_unknown = 0
+    unknowns = []
+    skips = []
+    normal = []
 
     for r in results:
-        fname = r["original"]
-
         if r["type"] is None:
-            print(f"  ? {fname}")
+            unknowns.append(r)
             to_unknown += 1
             continue
 
@@ -134,25 +134,43 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
             folder_name = r["cid"]
             target_base = jav_target
 
-        dest_dir = os.path.join(target_base, folder_name)
-        dest_path = os.path.join(dest_dir, clean_filename(r))
+        dest_path = os.path.join(target_base, folder_name, clean_filename(r))
+        r["_dest"] = os.path.join(folder_name, clean_filename(r))
 
-        print(f"  {r['type'].upper():4} {r['cid']:20} → {os.path.join(folder_name, clean_filename(r))}", end="")
         if os.path.exists(dest_path):
-            print("  SKIP (exists)")
+            skips.append(r)
             to_skip += 1
         else:
-            print()
+            normal.append(r)
             to_move += 1
 
     auto_parts = [r for r in results if r.get("auto_part")]
-    print(f"\nPlan: {to_move} move, {to_skip} skip, {to_unknown} unknown")
+
+    # Print summary
+    print(f"Found {len(files)} files in {source}")
+    print(f"  {to_move} to move, {to_skip} skip (exists), {to_unknown} unknown")
+
+    # Print issues only
+    issues = []
+    if unknowns:
+        issues.append(f"  Unknown ({len(unknowns)}):")
+        for r in unknowns:
+            issues.append(f"    ? {r['original']}")
+
+    if skips:
+        issues.append(f"  Already exists ({len(skips)}):")
+        for r in skips:
+            issues.append(f"    {r['original']}  →  {r['_dest']}")
 
     if auto_parts:
-        print(f"\n⚠  {len(auto_parts)} file(s) auto-assigned part numbers (REVIEW):")
+        issues.append(f"  Auto-assigned parts ({len(auto_parts)}):")
         for r in auto_parts:
-            folder = f"FC2-PPV-{r['cid']}" if r['type'] == 'fc2' else r['cid']
-            print(f"    {r['original']}  →  {folder}/{clean_filename(r)}")
+            issues.append(f"    {r['original']}  →  {r.get('_dest','')}")
+
+    if issues:
+        print()
+        for line in issues:
+            print(line)
 
     if to_move == 0:
         print("\nNothing to move.")
@@ -163,21 +181,18 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         conn.close()
         return
 
-    # Phase 2: confirm and execute
-    if not confirm:
-        try:
-            response = input(f"\nMove {to_move} file(s)? [y/N] ").strip().lower()
-        except EOFError:
-            response = "n"
-        if response not in ("y", "yes"):
-            print("Aborted.")
-            conn.close()
-            return
+    # Phase 2: auto-proceed if clean, stop if issues
+    has_issues = to_skip > 0 or to_unknown > 0 or len(auto_parts) > 0
+
+    if has_issues and not confirm:
+        print("\n⚠  Cannot proceed — issues detected. Review above and re-run with --yes to force.")
+        conn.close()
+        return
 
     print(f"\nMoving {to_move} file(s)...")
     moved = 0
     skipped = 0
-    for r in results:
+    for r in normal:
         if r["type"] is None:
             continue
 
@@ -185,10 +200,6 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         folder = f"FC2-PPV-{r['cid']}" if r["type"] == "fc2" else r["cid"]
         dest_dir = os.path.join(target_base, folder)
         dest_path = os.path.join(dest_dir, clean_filename(r))
-
-        if os.path.exists(dest_path):
-            skipped += 1
-            continue
 
         src_path = os.path.join(source, r["original"])
         os.makedirs(dest_dir, exist_ok=True)
