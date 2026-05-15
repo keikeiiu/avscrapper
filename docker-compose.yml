@@ -6,7 +6,8 @@
 
 services:
   scraper:
-    build: .
+    image: keiwarcraft/avscraper:latest
+    build: .  # fallback: builds locally if image not available
     container_name: avscraper
     volumes:
       - ./downloads:/app/downloads
