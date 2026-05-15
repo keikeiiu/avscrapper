@@ -237,7 +237,7 @@ def audit(config_path, dry_run=False, cids=None, vtype=None):
             elif status == "minor_mismatch":
                 hint = "minor — commercials cut?" if diff and diff < 0 else "minor — bonus content?"
             elif status == "hard_mismatch":
-                hint = "hard — missing parts!" if diff and diff < 0 else "hard — longer than expected, bonus/extended?"
+                hint = "hard — missing parts!" if diff and diff < 0 else "hard — possible different video?"
             else:
                 hint = "no video file found"
 
