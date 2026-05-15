@@ -52,6 +52,13 @@ def _expand(structure, entry, studio_map=None, series_map=None):
         return val[:n] if val else "_"
     result = re.sub(r'\{title:(\d+)\}', _title_slice, result)
 
+    # {series:N} → first N chars of series (sanitized)
+    def _series_slice(m):
+        n = int(m.group(1))
+        val = _sanitize(entry.get("series") or "")
+        return val[:n] if val else "_"
+    result = re.sub(r'\{series:(\d+)\}', _series_slice, result)
+
     raw_studio = entry.get("studio") or ""
     raw_series = entry.get("series") or ""
     mapped_studio = _sanitize(studio_map.get(raw_studio, raw_studio))
