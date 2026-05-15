@@ -288,18 +288,18 @@ class JavdbScraper(BaseScraper):
 
 
 def _parse_jav_runtime(text):
-    """Parse runtime string like '120 分' or '2:00:00' to integer minutes."""
+    """Parse runtime string like '120 分' or '2:00:00' to integer seconds."""
     if not text:
         return None
     text = text.strip()
     m = re.search(r'(\d+)\s*分', text)
     if m:
-        return int(m.group(1))
+        return int(m.group(1)) * 60  # minutes → seconds
     parts = text.split(":")
     if len(parts) == 3:
-        return int(parts[0]) * 60 + int(parts[1])
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
     if len(parts) == 2:
-        return int(parts[0])
+        return (int(parts[0]) * 60 + int(parts[1]))
     return None
 
 

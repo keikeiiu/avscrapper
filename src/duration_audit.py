@@ -10,11 +10,34 @@ from datetime import datetime
 from db import connect, init_db, find_directories
 
 
+def _find_ffprobe():
+    """Find ffprobe binary. Returns path or None."""
+    # Check common locations
+    import shutil
+    for candidate in ["ffprobe", "ffprobe.exe"]:
+        if shutil.which(candidate):
+            return candidate
+    # WinGet install location
+    winget_base = os.path.expandvars(
+        r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe")
+    for root, dirs, files in os.walk(winget_base):
+        for f in files:
+            if f == "ffprobe.exe":
+                return os.path.join(root, f)
+    return None
+
+
 def _ffprobe_duration(filepath):
     """Get video duration in seconds via ffprobe. Returns float or None."""
+    ffprobe = getattr(_ffprobe_duration, "_path", None)
+    if ffprobe is None:
+        ffprobe = _find_ffprobe()
+        _ffprobe_duration._path = ffprobe or "ffprobe"  # cache result
+    if not ffprobe:
+        return None
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+            [ffprobe, "-v", "quiet", "-show_entries", "format=duration",
              "-of", "csv=p=0", filepath],
             capture_output=True, text=True, timeout=30
         )
@@ -120,9 +143,20 @@ def audit(config_path, dry_run=False, cids=None, vtype=None):
         f"**Thresholds:** minor ≤{minor_thresh}s, hard >{hard_thresh}s\n",
     ]
 
+    def _jav_meta_seconds(e):
+        """JAV runtime_seconds was stored in minutes (legacy bug). Fix for audit."""
+        v = e.get("runtime_seconds")
+        if v is None:
+            return None
+        runtime_str = e.get("runtime") or ""
+        if "分" in runtime_str and v < 3600:
+            # Old data: stored minutes not seconds
+            return v * 60
+        return v
+
     for label, targets, extractor, table, file_table, meta_fn in [
         ("FC2", fc2_targets, _fc2_extractor, "fc2_entries", "fc2_files", _parse_fc2_duration),
-        ("JAV", jav_targets, _jav_extractor, "jav_entries", "jav_files", lambda e: e.get("runtime_seconds")),
+        ("JAV", jav_targets, _jav_extractor, "jav_entries", "jav_files", _jav_meta_seconds),
     ]:
         if vtype and vtype.lower() != label.lower():
             continue
