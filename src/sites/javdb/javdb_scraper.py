@@ -91,20 +91,14 @@ class JavdbScraper(BaseScraper):
             user_agent=self.user_agent,
             viewport={"width": 1920, "height": 1080},
         )
-        if self.cookies:
-            for k, v in self.cookies.items():
-                if not v:
-                    continue
-                context.add_cookies([{
-                    "name": k, "value": v,
-                    "domain": "javdb.com",
-                    "path": "/",
-                }])
         self._page = context.new_page()
 
-        # Visit homepage to establish Cloudflare / cookie context
-        self._page.goto(self.base_url + "/", timeout=30000, wait_until="domcontentloaded")
-        self._page.wait_for_timeout(3000)
+        # Set cookies before any navigation
+        if self.cookies:
+            context.add_cookies([
+                {"name": k, "value": v, "domain": ".javdb.com", "path": "/"}
+                for k, v in self.cookies.items() if v
+            ])
 
     def teardown(self):
         if hasattr(self, "_browser") and self._browser:
@@ -174,9 +168,9 @@ class JavdbScraper(BaseScraper):
             "url": url,
         }
 
-        # Check for login/VIP wall
+        # Check for login/VIP wall (the actual wall message, not the nav button)
         body = self._page.evaluate("document.body.innerText")
-        if "登入" in body or "此內容需要登入" in body:
+        if "此內容需要登入才能查看或操作" in body or "需要VIP權限才能訪問此內容" in body:
             data["title"] = None  # mark as login-required
             return data
 
