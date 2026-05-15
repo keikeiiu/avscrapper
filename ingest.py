@@ -121,7 +121,7 @@ def clean_filename(info):
     return f"{name}{ext}"
 
 
-def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False):
+def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False, confirm=False):
     from db import connect, init_db, insert_pending, insert_pending_jav
 
     if not os.path.isdir(source):
@@ -233,8 +233,34 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         conn.close()
         return
 
-    # Phase 2: move clean files, skip problematic ones
-    # Always proceed — just skip what can't be safely moved
+    # Phase 2: ask user, timeout → move clean only
+    has_issues = to_skip > 0 or to_unknown > 0 or len(auto_parts) > 0
+    if has_issues and not confirm:
+        print("\nSome files have issues (see above).")
+        print(f"Press Enter to move {to_move} clean file(s) only, type 'all' to force all, or wait 60s to auto-proceed.")
+        try:
+            import threading
+            resp = [None]
+            def _get_input():
+                try:
+                    resp[0] = input("> ").strip().lower()
+                except EOFError:
+                    pass
+            t = threading.Thread(target=_get_input, daemon=True)
+            t.start()
+            t.join(timeout=60)
+            if resp[0] is None:
+                print("\nTimeout — moving clean files only...")
+            elif resp[0] in ("all", "a", "yes", "y"):
+                print("Moving all files (including issues)...")
+                # Move everything — clear skip list
+                normal.extend(skips)
+                to_move += to_skip
+                to_skip = 0
+            else:
+                print("Moving clean files only...")
+        except Exception:
+            print("Timeout — moving clean files only...")
 
     print(f"\nMoving {to_move} file(s)...")
     moved = 0
@@ -295,6 +321,7 @@ def main():
     p.add_argument("--fc2-target", help="Target directory for FC2 videos")
     p.add_argument("--jav-target", help="Target directory for JAV videos")
     p.add_argument("--dry-run", action="store_true", help="Preview only, no moves")
+    p.add_argument("--yes", "-y", action="store_true", help="Move all files without prompting")
     p.add_argument("--scrape", action="store_true", help="Run scrapers after ingest")
     p.add_argument("--enrich", action="store_true", help="Write NFOs after ingest")
     args = p.parse_args()
@@ -325,7 +352,8 @@ def main():
            config.get("db_path", "fc2_data.db"),
            dry_run=args.dry_run,
            scrape=args.scrape,
-           enrich=args.enrich)
+           enrich=args.enrich,
+           confirm=args.yes)
 
 
 if __name__ == "__main__":
