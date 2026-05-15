@@ -9,41 +9,55 @@ Add to `config.yaml`:
 ```yaml
 reorganize:
   target: "C:/Users/keiwa/Downloads/reorganized_"
-  fc2_template: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid}"
-  jav_template: "JAV/{studio}/{series}/{cid}"
+  fc2_structure: "FC2/{seller}/{premiered:4}/{cid} - {title:50}"
+  jav_structure: "JAV/{studio}/{series}/{cid}"
+  studio_map:
+    SODクリエイト: SOD Create
+  series_map: {}
 ```
 
-## Template Variables
+## Structure Variables
 
 | Variable | Source | Example |
 |----------|--------|---------|
-| `{cid}` | DB cid | 409694, ABP-948 |
-| `{title}` | DB title | 密着ドキュメント |
+| `{cid}` | DB cid | 409694 |
+| `{title}` | DB title (sanitized) | 密着ドキュメント |
+| `{title:N}` | first N chars | `{title:50}` |
 | `{seller}` | FC2 seller | 六本木円光神話 |
-| `{studio}` | JAV studio / maker | S1 NO.1 STYLE |
+| `{studio}` | JAV studio (after map) | S1 NO.1 STYLE |
+| `{series}` | JAV series (after map) | 台本一切無し！！ |
 | `{label}` | JAV label | S1 NO.1 STYLE |
-| `{series}` | JAV series | 台本一切無し！！ |
 | `{director}` | JAV director | 嵐山みちる |
-| `{premiered}` | release_date (YYYY-MM-DD) | 2021-07-19 |
+| `{premiered}` | release_date | 2021-07-19 |
 | `{premiered:N}` | first N chars | `{premiered:4}` → 2021 |
 | `{year}` | year only | 2021 |
-| `{actress}` | first actress name | 架乃ゆら |
+| `{actress}` | first actress | 架乃ゆら |
 | `{rating}` | user rating | 4.16 |
 
-## Template Examples
+## Structure Examples
 
 ```yaml
-# FC2 — By seller then year
-fc2_template: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid}"
+# FC2 — Seller → Year → ID + Title
+fc2_structure: "FC2/{seller}/{premiered:4}/{cid} - {title:50}"
 
 # JAV — Studio → Series → ID
-jav_template: "JAV/{studio}/{series}/{cid}"
+jav_structure: "JAV/{studio}/{series}/{cid}"
 
-# JAV — Director-focused
-jav_template: "JAV/{director}/{premiered:4}/{cid}"
+# JAV — Director-focused with title
+jav_structure: "JAV/{director}/{premiered:4}/{cid} - {title:40}"
+```
 
-# JAV — Studio → Actress → ID
-jav_template: "JAV/{studio}/{actress}/{cid}"
+## Studio & Series Map
+
+Normalize inconsistent JavDB names:
+
+```yaml
+studio_map:
+  SODクリエイト: SOD Create
+  SODマジックミラー号: SOD Create
+
+series_map:
+  "※台本一切無し！！ハメ撮り！すっぴん！何でもアリ！ ○○のスケベ本性剥き出しSEX！！": "※台本一切無し！！"
 ```
 
 ## Safety

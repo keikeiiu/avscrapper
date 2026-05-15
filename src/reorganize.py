@@ -31,34 +31,47 @@ def _sanitize(s):
     return s or "unknown"
 
 
-def _expand(template, entry):
-    """Expand a template string with values from a DB entry dict."""
-    result = template
+def _expand(structure, entry, studio_map=None, series_map=None):
+    """Expand a structure string with values from a DB entry dict."""
+    result = structure
+    if studio_map is None: studio_map = {}
+    if series_map is None: series_map = {}
 
-    # {premiered:4} → first 4 chars of release_date
-    def _replace_date_slice(m):
+    # {premiered:N} → first N chars of release_date
+    def _slice(m):
         n = int(m.group(1))
         val = entry.get("release_date") or ""
         return val[:n] if val else "unknown"
 
-    result = re.sub(r'\{premiered:(\d+)\}', _replace_date_slice, result)
+    result = re.sub(r'\{premiered:(\d+)\}', _slice, result)
 
-    # Simple {key} replacements
-    replacements = {
-        "cid": entry.get("cid", ""),
-        "title": _sanitize(entry.get("title") or ""),
-        "seller": _sanitize(entry.get("seller") or entry.get("studio") or ""),
-        "studio": _sanitize(entry.get("studio") or ""),
-        "label": _sanitize(entry.get("label") or ""),
-        "series": _sanitize(entry.get("series") or ""),
-        "director": _sanitize(entry.get("director") or ""),
-        "premiered": entry.get("release_date") or "unknown",
-        "year": entry.get("year") or "unknown",
-        "rating": str(entry.get("rating") or ""),
-        "actress": _sanitize(_first_actress(entry)),
-    }
+    # {title:N} → first N chars of title (sanitized)
+    def _title_slice(m):
+        n = int(m.group(1))
+        val = _sanitize(entry.get("title") or "")
+        return val[:n] if val else "unknown"
+    result = re.sub(r'\{title:(\d+)\}', _title_slice, result)
 
-    for key, val in replacements.items():
+    raw_studio = entry.get("studio") or ""
+    raw_series = entry.get("series") or ""
+    mapped_studio = _sanitize(studio_map.get(raw_studio, raw_studio))
+    mapped_series = _sanitize(series_map.get(raw_series, raw_series))
+
+    replacements = [
+        ("cid", entry.get("cid", "")),
+        ("title", _sanitize(entry.get("title") or "")),
+        ("seller", _sanitize(entry.get("seller") or entry.get("studio") or "")),
+        ("studio", mapped_studio),
+        ("label", _sanitize(entry.get("label") or "")),
+        ("series", mapped_series),
+        ("director", _sanitize(entry.get("director") or "")),
+        ("premiered", entry.get("release_date") or "unknown"),
+        ("year", entry.get("year") or "unknown"),
+        ("rating", str(entry.get("rating") or "")),
+        ("actress", _sanitize(_first_actress(entry))),
+    ]
+
+    for key, val in replacements:
         result = result.replace("{" + key + "}", val)
 
     return result
@@ -126,23 +139,26 @@ def reorganize(config_path, dry_run=False, cids=None):
 
     conn = connect(raw_db)
 
+    studio_map = reorg.get("studio_map", {})
+    series_map = reorg.get("series_map", {})
+
     # ── FC2 ──
-    fc2_template = reorg.get("fc2_template")
-    if fc2_template and fc2_targets:
+    fc2_structure = reorg.get("fc2_structure")
+    if fc2_structure and fc2_targets:
         fc2_dirs = _find_source_dirs(fc2_targets, _fc2_extractor)
         entries = conn.execute(
             "SELECT * FROM fc2_entries WHERE status='scraped' AND title IS NOT NULL"
         ).fetchall()
-        _process_type("FC2", entries, fc2_dirs, fc2_template, target_base, conn, dry_run, cids)
+        _process_type("FC2", entries, fc2_dirs, fc2_structure, target_base, conn, dry_run, cids, studio_map, series_map)
 
     # ── JAV ──
-    jav_template = reorg.get("jav_template")
-    if jav_template and jav_targets:
+    jav_structure = reorg.get("jav_structure")
+    if jav_structure and jav_targets:
         jav_dirs = _find_source_dirs(jav_targets, _jav_extractor)
         entries = conn.execute(
             "SELECT * FROM jav_entries WHERE status='scraped' AND title IS NOT NULL"
         ).fetchall()
-        _process_type("JAV", entries, jav_dirs, jav_template, target_base, conn, dry_run, cids)
+        _process_type("JAV", entries, jav_dirs, jav_structure, target_base, conn, dry_run, cids, studio_map, series_map)
 
     conn.close()
 
@@ -158,9 +174,11 @@ def _jav_extractor(name):
     return m.group(1).upper().replace("_", "-") if m else None
 
 
-def _process_type(label, entries, cid_dirs, template, target_base, conn,
-                  dry_run=False, cids=None):
+def _process_type(label, entries, cid_dirs, structure, target_base, conn,
+                  dry_run=False, cids=None, studio_map=None, series_map=None):
     """Process one type (FC2 or JAV)."""
+    if studio_map is None: studio_map = {}
+    if series_map is None: series_map = {}
     if cids:
         entries = [e for e in entries if str(e["cid"]) in cids]
 
@@ -174,7 +192,7 @@ def _process_type(label, entries, cid_dirs, template, target_base, conn,
     no_dir = 0
     report = []
     report.append(f"# {label} Reorganize Report\n")
-    report.append(f"**Template:** `{template}`\n")
+    report.append(f"**Structure:** `{structure}`\n")
     report.append(f"**Target:** {target_base}\n\n")
     report.append("| ID | From | To | Status |")
     report.append("|----|------|----|--------|")
@@ -194,7 +212,7 @@ def _process_type(label, entries, cid_dirs, template, target_base, conn,
 
         src_base, src_folder = dir_info
         src_path = os.path.join(src_base, src_folder)
-        rel_path = _expand(template, entry)
+        rel_path = _expand(structure, entry, studio_map, series_map)
         dest_path = os.path.join(target_base, rel_path)
 
         print(f"[{i+1}/{total}] {cid}: {src_folder} → {rel_path}")

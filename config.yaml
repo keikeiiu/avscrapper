@@ -13,8 +13,10 @@ ingest:
 # Folder reorganizer
 reorganize:
   target: "C:/Users/keiwa/Downloads/reorganized_"
-  fc2_template: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid}"
-  jav_template: "JAV/{studio}/{series}/{cid}"
+  fc2_structure: "FC2/{seller}/{premiered:4}/{cid} - {title:50}"
+  jav_structure: "JAV/{studio}/{series}/{cid}"
+  studio_map: {}
+  series_map: {}
 
 # Per-site scraper configuration
 sites:
