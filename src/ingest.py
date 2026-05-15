@@ -199,8 +199,14 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     auto_parts = [r for r in results if r.get("auto_part")]
 
     # Print summary
+    fc2_count = sum(1 for r in results if r["type"] == "fc2")
+    jav_count = sum(1 for r in results if r["type"] == "jav")
     print(f"Found {len(files)} files in {source}")
-    print(f"  {to_move} to move, {to_skip} skip (exists), {to_unknown} unknown")
+    parts = []
+    if fc2_count: parts.append(f"{fc2_count} FC2")
+    if jav_count: parts.append(f"{jav_count} JAV")
+    type_str = " + ".join(parts) if parts else "?"
+    print(f"  {to_move} to move ({type_str}), {to_skip} skip, {to_unknown} unknown")
 
     # Print issues only
     issues = []
