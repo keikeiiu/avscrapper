@@ -7,7 +7,7 @@ import argparse
 import json
 import yaml
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from db import connect, get_scraped_jav, mark_status_jav
+from db import connect, get_scraped_jav, mark_status_jav, find_directories
 from sites.javdb.jav_nfo import parse_nfo, build_nfo, merge_fields, merge_actors
 
 
@@ -141,7 +141,7 @@ def enrich_jav(targets, db_path, cids=None, dry_run=False, report_dir=None):
 
     report_lines.append(f"\n**Summary:** {updated} updated, {skipped} skipped, {no_dir} no directory")
     from datetime import date
-today = date.today().isoformat()
+    today = date.today().isoformat()
     report_path = os.path.join(report_dir, f"enrichment-jav-{today}.md")
     os.makedirs(report_dir, exist_ok=True)
     with open(report_path, "a", encoding="utf-8") as f:
