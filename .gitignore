@@ -2,3 +2,8 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+config.yaml
+downloads/
+processed/
+reorganized/
+reports/

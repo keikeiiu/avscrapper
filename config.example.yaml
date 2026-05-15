@@ -1,0 +1,93 @@
+# AV Scraper — Example Configuration
+# Copy to config.yaml and fill in your paths + cookies.
+
+db_path: "av_data.db"
+report_dir: "reports"
+
+# Ingest — where downloads arrive and where organized files go
+ingest:
+  source: "./downloads"
+  fc2_target: "./processed"
+  jav_target: "./processed"
+
+# Reorganize — metadata-driven folder hierarchy
+reorganize:
+  target: "./reorganized"
+  fc2_structure: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid} - {title:50}"
+  jav_structure: "JAV/{studio}/{code}/{series:40}/{cid} - {title:50}"
+  studio_map:
+    # SOD group → canonical
+    SODクリエイト: SOD Create
+    SODマジックミラー号: SOD Create
+    SOD Create: SOD Create
+    # PRESTIGE
+    プレステージ: PRESTIGE
+    PRESTIGE: PRESTIGE
+    # WILL group
+    S1 NO.1 STYLE: S1 NO.1 STYLE
+    アイデアポケット: IDEAPOCKET
+    IDEA POCKET: IDEAPOCKET
+    IDEAPOCKET: IDEAPOCKET
+    MOODYZ: MOODYZ
+    MOODYZ DIVA: MOODYZ
+    kawaii: kawaii
+    カワイイ: kawaii
+    Madonna: Madonna
+    マドンナ: Madonna
+    ATTACKERS: ATTACKERS
+    アタッカーズ: ATTACKERS
+    FALENO: FALENO
+    ファレノ: FALENO
+    DAS: DAS
+    ダスッ！: DAS
+    PREMIUM: PREMIUM
+    プレミアム: PREMIUM
+    OPPAI: OPPAI
+    WANZ: WANZ
+    E-BODY: E-BODY
+    本中: HND
+    HND: HND
+    ROCKET: ROCKET
+    # Other majors
+    MAXING: MAXING
+    アリスJAPAN: ALICE JAPAN
+    ALICE JAPAN: ALICE JAPAN
+    MAX-A: MAX-A
+    h.m.p: h.m.p
+    KMP: KMP
+    ケイエムプロデュース: KMP
+    million: KMP
+    TEPPAN: TEPPAN
+    鉄板: TEPPAN
+    VENUS: VENUS
+    ヴィーナス: VENUS
+    # Fitch / Aroma / others
+    Fitch: Fitch
+    花子: Hanako
+    Hanako: Hanako
+    妄想族: Mousouzoku
+    Mousouzoku: Mousouzoku
+  series_map: {}
+
+# Per-site scraper configuration
+sites:
+  fc2ppvdb:
+    base_url: "https://fc2ppvdb.com"
+    scrape_delay_seconds: "5-20"
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
+    cookies:
+      # From F12 → Application → Cookies → fc2ppvdb.com
+      age_pass: ""
+      cf_clearance: ""
+      fc2ppvdb_session: ""
+      remember_web_xxx: ""
+      stype: ""
+      XSRF-TOKEN: ""
+  javdb:
+    base_url: "https://javdb.com"
+    scrape_delay_seconds: "5-20"
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
+    cookies:
+      # From F12 → Application → Cookies → javdb.com
+      over18: "1"
+      _jdb_session: ""
