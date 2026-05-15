@@ -165,10 +165,11 @@ class BaseScraper(ABC):
         parser = cls.build_argparser()
         args = parser.parse_args(argv)
 
-        config_path = os.environ.get(
-            "FC2_CONFIG",
-            os.path.join(os.path.dirname(__file__), "..", "fc2_config.yaml"),
-        )
+        config_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(config_parent, "config.yaml")
+        if not os.path.exists(config_path):
+            config_path = os.path.join(config_parent, "fc2_config.yaml")
+        config_path = os.environ.get("AV_CONFIG", config_path)
         config_path = os.path.normpath(config_path)
         with open(config_path) as f:
             config = yaml.safe_load(f)

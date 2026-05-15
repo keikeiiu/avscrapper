@@ -157,13 +157,17 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="Preview changes, no writes")
     args = p.parse_args()
 
-    config_path = os.environ.get("FC2_CONFIG", os.path.join(os.path.dirname(__file__), "fc2_config.yaml"))
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(base_dir, "config.yaml")
+    if not os.path.exists(config_path):
+        config_path = os.path.join(base_dir, "fc2_config.yaml")
+    config_path = os.environ.get("AV_CONFIG", config_path)
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
     scan_dirs = config.get("scan_directories", [])
     if not scan_dirs:
-        print("No scan_directories in config. Add directories to fc2_config.yaml.")
+        print("No scan_directories in config. Add directories to config.yaml.")
         sys.exit(1)
 
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
