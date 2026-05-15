@@ -73,6 +73,7 @@ def init_db(db_path):
             rating           REAL,
             votes            INT,
             uncensored       INT DEFAULT 0,
+            region           TEXT DEFAULT 'jav',
             url              TEXT,
             source           TEXT,
             status           TEXT DEFAULT 'pending',
@@ -106,7 +107,7 @@ def init_db(db_path):
     """)
     # Migrate existing databases
     for table in ("fc2_entries", "jav_entries"):
-        for col in ("audit_status", "last_audited"):
+        for col in ("audit_status", "last_audited", "region"):
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
             except sqlite3.OperationalError:
@@ -286,9 +287,9 @@ def upsert_scraped_jav(conn, cid, data, source):
         INSERT INTO jav_entries (cid, full_number, title, title_en, plot,
             studio, label, series, director, release_date, year,
             runtime, runtime_seconds, cover_url, fanart_urls, genres,
-            actors, rating, votes, uncensored, url, source,
+            actors, rating, votes, uncensored, region, url, source,
             status, scraped_at, raw_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scraped', datetime('now'), ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scraped', datetime('now'), ?)
         ON CONFLICT(cid) DO UPDATE SET
             title=excluded.title, title_en=excluded.title_en, plot=excluded.plot,
             studio=excluded.studio, label=excluded.label, series=excluded.series,
@@ -297,7 +298,8 @@ def upsert_scraped_jav(conn, cid, data, source):
             runtime_seconds=excluded.runtime_seconds, cover_url=excluded.cover_url,
             fanart_urls=excluded.fanart_urls, genres=excluded.genres,
             actors=excluded.actors, rating=excluded.rating, votes=excluded.votes,
-            uncensored=excluded.uncensored, url=excluded.url, source=excluded.source,
+            uncensored=excluded.uncensored, region=excluded.region,
+            url=excluded.url, source=excluded.source,
             status='scraped', scraped_at=datetime('now'), raw_json=excluded.raw_json
     """, (
         cid,
@@ -320,6 +322,7 @@ def upsert_scraped_jav(conn, cid, data, source):
         data.get("rating"),
         data.get("votes"),
         data.get("uncensored", 0),
+        data.get("region", "jav"),
         data.get("url"),
         source,
         json.dumps(data, ensure_ascii=False),

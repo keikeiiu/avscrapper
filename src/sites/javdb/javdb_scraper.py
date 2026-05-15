@@ -70,6 +70,10 @@ class JavdbScraper(BaseScraper):
                     print("VIP only")
                     not_found += 1
                 else:
+                    # Auto-detect region
+                    studio = (data.get("studio") or "").lower()
+                    chinese = {"麻豆傳媒映畫", "麻豆传媒映画", "大象传媒", "madou", "麻豆"}
+                    data["region"] = "chinese" if any(c in studio for c in chinese) else "jav"
                     upsert_scraped_jav(conn, cid, data, self.source)
                     status = (data.get("title") or "OK")[:60]
                     print(status)
