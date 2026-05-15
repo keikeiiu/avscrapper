@@ -1,7 +1,7 @@
 # AV Scraper Configuration
 # Cookies captured 2026-05-13 from authenticated browser session
 
-db_path: "fc2_data.db"
+db_path: "av_data.db"
 
 # Directories to scan for video files
 scan_directories:
