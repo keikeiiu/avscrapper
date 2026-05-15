@@ -2,64 +2,78 @@
 
 Scrapes metadata → SQLite → Kodi-compliant NFO files.
 
-## Sites
-
-| Site | Scraper | Enricher | Guide |
-|------|---------|----------|-------|
-| [fc2ppvdb.com](https://fc2ppvdb.com) | `scrapers/fc2ppvdb_scraper.py` | `fc2_enricher.py` | [README.fc2ppv.md](README.fc2ppv.md) |
-| [javdb.com](https://javdb.com) | `scrapers/javdb_scraper.py` | `jav_enricher.py` | [README.javdb.md](README.javdb.md) |
-
-## Setup
+## Quick Start
 
 ```bash
+# 1. Create config
+cp config.example.yaml config.yaml
+
+# 2. Install
 pip install -r requirements.txt
+playwright install chromium
+
+# 3. Drop downloaded videos into ./downloads/
+# 4. Run the pipeline
+python avscraper.py ingest --source ./downloads
+python avscraper.py scrape fc2ppvdb
+python avscraper.py scrape javdb
+python avscraper.py enrich fc2ppvdb
+python avscraper.py enrich javdb
+python avscraper.py reorganize --dry-run
+python avscraper.py reorganize
+```
+
+## Install
+
+### Windows
+```bash
+python -m pip install -r requirements.txt
+python -m playwright install chromium
+```
+
+### macOS
+```bash
+pip3 install -r requirements.txt
 playwright install chromium
 ```
 
-## Shared Architecture
-
-```
-[Video folders] → scraper.py → Playwright → site.com
-                                    ↓
-                               fc2_data.db (SQLite)
-                                    ↓
-[Video folders] → enricher.py → .nfo files + report.md
+### Docker
+```bash
+docker build -t avscraper .
+docker run -v ./downloads:/app/downloads -v ./processed:/app/processed -v ./config.yaml:/app/config.yaml avscraper ingest --source /app/downloads
 ```
 
-## Shared Components
-
-| File | Purpose |
-|------|---------|
-| `config.yaml` | Cookies, delays, scan dirs |
-| `db.py` | SQLite: `fc2_entries`, `fc2_files`, `jav_entries`, `jav_files` |
-| `scrapers/base.py` | CLI, rate-limiting, DB writes |
-| `fc2_nfo.py` | FC2 NFO XML builder |
-| `jav_nfo.py` | JAV NFO XML builder |
-
-## Checking Progress
+## Entry Point
 
 ```bash
-sqlite3 fc2_data.db "SELECT source, status, COUNT(*) FROM fc2_entries GROUP BY source, status"
-sqlite3 fc2_data.db "SELECT source, status, COUNT(*) FROM jav_entries GROUP BY source, status"
+python avscraper.py ingest [--source ./downloads] [--dry-run]
+python avscraper.py scrape <fc2ppvdb|javdb> [--ids ...]
+python avscraper.py enrich <fc2ppvdb|javdb> [--ids ...]
+python avscraper.py reorganize [--dry-run] [--report]
 ```
+
+## Sites
+
+| Site | Guide |
+|------|-------|
+| fc2ppvdb.com | [README.fc2ppv.md](README.fc2ppv.md) |
+| javdb.com | [README.javdb.md](README.javdb.md) |
 
 ## Reorganizer
 
-Move organized folders into a metadata-driven hierarchy.
+Metadata-driven folder hierarchy via configurable templates. See [README.reorganize.md](README.reorganize.md).
 
 ```bash
-python reorganize.py --dry-run     # preview
-python reorganize.py               # execute
-python reorganize.py --ids 409694  # specific entries
+python avscraper.py reorganize --dry-run
+python avscraper.py reorganize --report
 ```
 
-See [README.reorganize.md](README.reorganize.md) for template config.
+## Config
 
-## Delay Format
+Copy `config.example.yaml` → `config.yaml` and set your paths + cookies. All paths are relative to the config file. See [README.reorganize.md](README.reorganize.md) for structure templates and studio/series maps.
 
-| Value | Behavior |
-|-------|----------|
-| `5` | Fixed 5s |
-| `"5-20"` | Random 5–20s (human-like) |
+## DB Stats
 
-Set in `config.yaml` (`scrape_delay_seconds`) or `--delay` CLI flag.
+```bash
+python -c "from src.db import connect,get_stats; c=connect('av_data.db'); [print(f'{r[\"source\"]:12} {r[\"status\"]:10} {r[\"count\"]}') for r in get_stats(c)]"
+```
