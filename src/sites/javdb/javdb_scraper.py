@@ -65,6 +65,10 @@ class JavdbScraper(BaseScraper):
                     mark_status_jav(conn, cid, "404")
                     print("404")
                     not_found += 1
+                elif data.get("title") is None:
+                    mark_status_jav(conn, cid, "login_required")
+                    print("VIP only")
+                    not_found += 1
                 else:
                     upsert_scraped_jav(conn, cid, data, self.source)
                     status = (data.get("title") or "OK")[:60]
@@ -169,6 +173,12 @@ class JavdbScraper(BaseScraper):
             "full_number": cid,
             "url": url,
         }
+
+        # Check for login/VIP wall
+        body = self._page.evaluate("document.body.innerText")
+        if "登入" in body or "此內容需要登入" in body:
+            data["title"] = None  # mark as login-required
+            return data
 
         # Title — from <title> tag
         title_el = self._page.query_selector("title")
