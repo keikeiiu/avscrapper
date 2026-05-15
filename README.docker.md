@@ -63,6 +63,19 @@ docker compose run avscraper reorganize
 docker compose run avscraper reorganize --report
 ```
 
+## Without Compose (plain Docker)
+
+```bash
+docker run --rm \
+  -v ./downloads:/app/downloads \
+  -v ./processed:/app/processed \
+  -v ./config.yaml:/app/config.yaml:ro \
+  -v av_data:/app \
+  keikeiiu/avscraper ingest --dry-run
+```
+
+Same commands work — just replace `docker compose run avscraper` with the `docker run` line above.
+
 ## Tips
 
 - All data lives in Docker volumes + your mounted folders — nothing is lost on restart
