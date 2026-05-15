@@ -225,20 +225,24 @@ def audit(config_path, dry_run=False, cids=None, vtype=None):
         report_lines.append("|----|----------|--------|------|--------|")
 
         icons = {"ok": "🟢", "minor_mismatch": "🟡", "hard_mismatch": "🔴", "no_file": "⚪"}
-        hints = {
-            "ok": "ok",
-            "minor_mismatch": "minor — commercials cut?",
-            "hard_mismatch": "hard — missing parts! Get more seeds",
-            "no_file": "no video file found",
-        }
 
         for cid, meta_sec, actual_sec, status in rows:
             meta_str = _format_duration(meta_sec)
             actual_str = _format_duration(actual_sec)
-            diff = (actual_sec - meta_sec) if (meta_sec and actual_sec) else None  # + longer, - shorter
+            diff = (actual_sec - meta_sec) if (meta_sec and actual_sec) else None
             diff_str = _format_diff(diff) if diff is not None else "—"
+
+            if status == "ok":
+                hint = "ok"
+            elif status == "minor_mismatch":
+                hint = "minor — commercials cut?" if diff and diff < 0 else "minor — bonus content?"
+            elif status == "hard_mismatch":
+                hint = "hard — missing parts!" if diff and diff < 0 else "hard — longer than expected, bonus/extended?"
+            else:
+                hint = "no video file found"
+
             report_lines.append(
-                f"| {cid} | {meta_str} | {actual_str} | {diff_str} | {icons[status]} {hints[status]} |")
+                f"| {cid} | {meta_str} | {actual_str} | {diff_str} | {icons[status]} {hint} |")
 
         report_lines.append("")
         print(f"{label}: {ok_count} ok, {minor_count} minor, {hard_count} hard, {nofile_count} no file")
