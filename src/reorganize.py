@@ -246,16 +246,59 @@ def _walk_files(d):
             yield os.path.join(root, f)
 
 
+def _generate_structure_report(target_base, report_dir):
+    """Generate a tree-view markdown report of the reorganized folder."""
+    if not os.path.isdir(target_base):
+        print(f"Target directory not found: {target_base}")
+        return
+
+    from datetime import date
+    lines = [f"# Reorganized Structure Report",
+             f"**Date:** {date.today().isoformat()}",
+             f"**Target:** {target_base}\n",
+             "```"]
+    for root, dirs, files in os.walk(target_base):
+        depth = root.replace(target_base, "").count(os.sep)
+        indent = "  " * depth
+        folder = os.path.basename(root) or target_base
+        lines.append(f"{indent}{folder}/")
+        for f in sorted(files):
+            lines.append(f"{indent}  {f}")
+    lines.append("```")
+
+    os.makedirs(report_dir, exist_ok=True)
+    path = os.path.join(report_dir, f"reorganized-structure-{date.today().isoformat()}.md")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    print(f"Structure report: {path}")
+
+
 def main():
     p = argparse.ArgumentParser(description="Folder Reorganizer — metadata-driven hierarchy")
     p.add_argument("--dry-run", action="store_true", help="Preview only")
     p.add_argument("--ids", help="Comma-separated CIDs to reorganize")
+    p.add_argument("--report", action="store_true", help="Generate structure report only, no moves")
     args = p.parse_args()
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "config.yaml")
     if not os.path.exists(config_path):
         config_path = os.path.join(base_dir, "fc2_config.yaml")
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+
+    target_base = config.get("reorganize", {}).get("target")
+    report_dir = config.get("report_dir", "reports")
+    if not os.path.isabs(report_dir):
+        report_dir = os.path.normpath(os.path.join(os.path.dirname(config_path), report_dir))
+
+    if args.report:
+        if not target_base:
+            print("No reorganize.target in config.yaml")
+            return
+        _generate_structure_report(target_base, report_dir)
+        return
 
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
 
