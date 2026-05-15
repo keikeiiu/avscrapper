@@ -72,7 +72,10 @@ class JavdbScraper(BaseScraper):
                 else:
                     # Auto-detect region
                     studio = (data.get("studio") or "").lower()
-                    chinese = {"麻豆傳媒映畫", "麻豆传媒映画", "大象传媒", "madou", "麻豆"}
+                    chinese = {"麻豆傳媒映畫", "麻豆传媒映画", "大象传媒", "madou", "麻豆",
+                               "精东影业", "天美传媒", "星空无限传媒", "蜜桃影像", "糖心",
+                               "皇家华人", "果冻传媒", "扣扣传媒", "爱豆传媒", "兔子先生",
+                               "swag", "91制片厂", "NHAV", "EDEA"}
                     data["region"] = "chinese" if any(c in studio for c in chinese) else "jav"
                     upsert_scraped_jav(conn, cid, data, self.source)
                     status = (data.get("title") or "OK")[:60]
