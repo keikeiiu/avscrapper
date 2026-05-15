@@ -158,6 +158,12 @@ def main():
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
+    # Resolve relative db_path
+    raw_db = config.get("db_path", "av_data.db")
+    if not os.path.isabs(raw_db):
+        raw_db = os.path.normpath(os.path.join(os.path.dirname(config_path), raw_db))
+    config["db_path"] = raw_db
+
     ing = config.get("ingest", {})
     targets = [ing.get("fc2_target")] if ing.get("fc2_target") else []
     if not targets:
