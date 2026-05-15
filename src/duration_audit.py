@@ -78,7 +78,7 @@ def _format_diff(seconds):
     """Show diff as signed HH:MM:SS."""
     if seconds is None:
         return "—"
-    sign = "-" if seconds < 0 else ""
+    sign = "-" if seconds < 0 else "+"
     s = abs(int(seconds))
     h = s // 3600
     m = (s % 3600) // 60
@@ -235,7 +235,7 @@ def audit(config_path, dry_run=False, cids=None, vtype=None):
         for cid, meta_sec, actual_sec, status in rows:
             meta_str = _format_duration(meta_sec)
             actual_str = _format_duration(actual_sec)
-            diff = abs(meta_sec - actual_sec) if (meta_sec and actual_sec) else None
+            diff = (actual_sec - meta_sec) if (meta_sec and actual_sec) else None  # + longer, - shorter
             diff_str = _format_diff(diff) if diff is not None else "—"
             report_lines.append(
                 f"| {cid} | {meta_str} | {actual_str} | {diff_str} | {icons[status]} {hints[status]} |")
