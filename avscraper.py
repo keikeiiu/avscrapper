@@ -106,6 +106,8 @@ def main():
             print(f"Unknown site: {site}")
     elif command == "reorganize":
         _run_script("reorganize.py", *extra)
+    elif command == "audit":
+        _run_script("duration_audit.py", *extra)
     elif command == "setup":
         _setup(config, config_path)
     else:

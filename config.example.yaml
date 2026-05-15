@@ -11,6 +11,11 @@ ingest:
   jav_target: "./processed"
 
 # Reorganize — metadata-driven folder hierarchy
+# Duration audit
+duration_audit:
+  minor_threshold: 30
+  hard_threshold: 60
+
 reorganize:
   target: "./reorganized"
   fc2_structure: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid} - {title:50}"

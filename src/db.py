@@ -34,6 +34,8 @@ def init_db(db_path):
             status           TEXT DEFAULT 'pending',
             error_message    TEXT,
             scraped_at       TEXT,
+            audit_status     TEXT,
+            last_audited     TEXT,
             raw_json         TEXT
         );
 
@@ -76,6 +78,8 @@ def init_db(db_path):
             status           TEXT DEFAULT 'pending',
             error_message    TEXT,
             scraped_at       TEXT,
+            audit_status     TEXT,
+            last_audited     TEXT,
             raw_json         TEXT
         );
 
@@ -100,6 +104,13 @@ def init_db(db_path):
         CREATE INDEX IF NOT EXISTS idx_jav_entries_source ON jav_entries(source);
         CREATE INDEX IF NOT EXISTS idx_jav_files_cid ON jav_files(cid);
     """)
+    # Migrate existing databases
+    for table in ("fc2_entries", "jav_entries"):
+        for col in ("audit_status", "last_audited"):
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass  # column already exists
     conn.commit()
     conn.close()
 
@@ -221,19 +232,18 @@ def find_directories(targets, id_extractor):
     for base in targets:
         if not _os.path.isdir(base):
             continue
-        for name in _os.listdir(base):
-            full = _os.path.join(base, name)
-            if not _os.path.isdir(full):
-                continue
-            cid = id_extractor(name)
-            if cid is None:
-                continue
-            has_video = any(
-                _os.path.splitext(f)[1].lower() in VIDEO_EXTS
-                for f in _os.listdir(full) if _os.path.isfile(_os.path.join(full, f))
-            )
-            if has_video or cid not in cid_dirs:
-                cid_dirs[cid] = full
+        for root, dirs, files in _os.walk(base):
+            for name in dirs:
+                cid = id_extractor(name)
+                if cid is None:
+                    continue
+                full = _os.path.join(root, name)
+                has_video = any(
+                    _os.path.splitext(f)[1].lower() in VIDEO_EXTS
+                    for f in _os.listdir(full) if _os.path.isfile(_os.path.join(full, f))
+                )
+                if cid not in cid_dirs or (has_video and len(root) < len(cid_dirs[cid])):
+                    cid_dirs[cid] = full
     return cid_dirs
 
 
