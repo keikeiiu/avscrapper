@@ -46,6 +46,7 @@ def init_db(db_path):
             duration_seconds REAL,
             duration_str     TEXT,
             part_number      INTEGER DEFAULT 1,
+            auto_part        INTEGER DEFAULT 0,
             FOREIGN KEY (cid) REFERENCES fc2_entries(cid)
         );
 
@@ -87,6 +88,7 @@ def init_db(db_path):
             duration_seconds REAL,
             duration_str     TEXT,
             part_number      INTEGER DEFAULT 1,
+            auto_part        INTEGER DEFAULT 0,
             FOREIGN KEY (cid) REFERENCES jav_entries(cid)
         );
 

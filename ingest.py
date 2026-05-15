@@ -10,8 +10,7 @@ import yaml
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v"}
 FC2_RE = re.compile(r'FC2[ -]?PPV[ -]?(\d{6,8})', re.IGNORECASE)
 JAV_RE = re.compile(r'\b([A-Z]{2,6}[ -]?\d{2,5})\b')
-PART_RE = re.compile(r'[-_](?:part?\s*|pt\s*|cd\s*|dvd\s*|disk\s*|disc\s*)(\d+)', re.IGNORECASE)
-CIRCLE_RE = re.compile(r'[①②③④⑤⑥⑦⑧⑨⑩]')
+PART_RE = re.compile(r'[-_ ](?:part\s*|pt\s*|cd\s*|dvd\s*|disk\s*|disc\s*)(\d+)\b', re.IGNORECASE)
 
 
 def detect_type(filename):
@@ -34,12 +33,27 @@ def _part_number(stem):
     m = PART_RE.search(stem)
     if m:
         return int(m.group(1))
-    if CIRCLE_RE.search(stem):
-        circle_map = {"①":1,"②":2,"③":3,"④":4,"⑤":5,"⑥":6,"⑦":7,"⑧":8,"⑨":9,"⑩":10}
-        for c, n in circle_map.items():
-            if c in stem:
-                return n
     return 1
+
+
+def _assign_parts(results):
+    """Auto-assign part numbers when multiple files share the same (type, cid)
+    and none have explicit part markers.  Already-explicit parts are left alone."""
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for i, r in enumerate(results):
+        if r["type"]:
+            groups[(r["type"], r["cid"])].append(i)
+
+    for (vtype, cid), indices in groups.items():
+        if len(indices) <= 1:
+            continue
+        has_explicit = any(results[i]["part"] > 1 for i in indices)
+        if has_explicit:
+            continue  # trust explicit -pt1/-pt2 markers
+        for seq, i in enumerate(sorted(indices), 1):
+            results[i]["part"] = seq
+            results[i]["auto_part"] = True
 
 
 def clean_filename(info):
@@ -85,6 +99,7 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
                 "cid": cid,
                 "part": part,
                 "ext": ext,
+                "auto_part": False,
             })
         else:
             results.append({
@@ -94,6 +109,9 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
                 "part": 1,
                 "ext": os.path.splitext(fname)[1].lower(),
             })
+
+    # Auto-assign part numbers for duplicate CIDs without explicit markers
+    _assign_parts(results)
 
     print(f"Found {len(files)} files in {source}\n")
     moved = 0
@@ -119,7 +137,14 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         new_name = clean_filename(r)
         dest_path = os.path.join(dest_dir, new_name)
 
-        print(f"  {r['type'].upper():4} {r['cid']:20} → {os.path.join(folder_name, new_name)}")
+        print(f"  {r['type'].upper():4} {r['cid']:20} → {os.path.join(folder_name, new_name)}", end="")
+
+        if os.path.exists(dest_path):
+            print("  SKIP (exists)")
+            skipped += 1
+            continue
+
+        print()  # newline after status
 
         if dry_run:
             moved += 1
@@ -141,9 +166,15 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
 
     conn.close()
 
+    auto_parts = [r for r in results if r.get("auto_part")]
     print(f"\nDone: {moved} moved" + (" (dry-run)" if dry_run else "") +
           (f", {skipped} skipped" if skipped else "") +
           (f", {unknown} unknown" if unknown else ""))
+
+    if auto_parts:
+        print(f"\n⚠  {len(auto_parts)} file(s) auto-assigned part numbers (REVIEW):")
+        for r in auto_parts:
+            print(f"    {r['original']}  →  {clean_filename(r)}")
 
     # Optional: trigger scraper
     if scrape and not dry_run:
