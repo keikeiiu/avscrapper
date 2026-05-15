@@ -205,6 +205,38 @@ def get_errors(conn, source=None):
     return [dict(r) for r in rows]
 
 
+import os as _os
+VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v"}
+
+
+def find_directories(targets, id_extractor):
+    """Walk target dirs, return {cid: best_dir_path}.
+    Prefers directories that contain video files.
+
+    Args:
+        targets: list of base directories to scan
+        id_extractor: callable(folder_name) → cid | None
+    """
+    cid_dirs = {}
+    for base in targets:
+        if not _os.path.isdir(base):
+            continue
+        for name in _os.listdir(base):
+            full = _os.path.join(base, name)
+            if not _os.path.isdir(full):
+                continue
+            cid = id_extractor(name)
+            if cid is None:
+                continue
+            has_video = any(
+                _os.path.splitext(f)[1].lower() in VIDEO_EXTS
+                for f in _os.listdir(full) if _os.path.isfile(_os.path.join(full, f))
+            )
+            if has_video or cid not in cid_dirs:
+                cid_dirs[cid] = full
+    return cid_dirs
+
+
 def get_stats(conn):
     """Return status counts across both tables."""
     fc2 = conn.execute("""

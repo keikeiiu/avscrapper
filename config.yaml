@@ -3,12 +3,6 @@
 
 db_path: "av_data.db"
 
-# Directories to scan for video files
-scan_directories:
-  - "C:/Users/keiwa/Downloads/_AV/FC2"
-  - "F:/AV/Japanese/FC2"
-  - "F:/AV/Japanese/JAV/_Unprocessed"
-
 # Ingest defaults
 ingest:
   source: "C:/Users/keiwa/Downloads/new fc2"

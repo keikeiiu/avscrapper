@@ -5,7 +5,7 @@ import os
 import re
 import argparse
 import yaml
-from db import connect, get_scraped, mark_status
+from db import connect, get_scraped, mark_status, find_directories
 from fc2_nfo import parse_nfo, build_nfo, merge_fields
 
 
@@ -21,28 +21,18 @@ def _parse_runtime_minutes(dur):
     return None
 
 
-def find_directories(scan_dirs):
-    """Walk scan_dirs and return {cid: dir_path} for all FC2-PPV-* folders."""
-    cid_dirs = {}
-    for base in scan_dirs:
-        if not os.path.isdir(base):
-            continue
-        for name in os.listdir(base):
-            if not name.startswith("FC2-PPV-"):
-                continue
-            full = os.path.join(base, name)
-            if not os.path.isdir(full):
-                continue
-            cid = name.replace("FC2-PPV-", "").split("[")[0].split("_")[0].strip()
-            cid_dirs[cid] = full
-    return cid_dirs
+def _fc2_id_extractor(folder_name):
+    """Extract CID from FC2-PPV-* folder name."""
+    if not folder_name.startswith("FC2-PPV-"):
+        return None
+    return folder_name.replace("FC2-PPV-", "").split("[")[0].split("_")[0].strip()
 
 
-def enrich(scan_dirs, db_path, cids=None, dry_run=False):
+def enrich(targets, db_path, cids=None, dry_run=False):
     """Main enrichment loop."""
     conn = connect(db_path)
     entries = get_scraped(conn, source="fc2ppvdb")
-    cid_dirs = find_directories(scan_dirs)
+    cid_dirs = find_directories(targets, _fc2_id_extractor)
 
     if cids:
         entries = [e for e in entries if str(e["cid"]) in cids]
@@ -165,14 +155,18 @@ def main():
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
-    scan_dirs = config.get("scan_directories", [])
-    if not scan_dirs:
-        print("No scan_directories in config. Add directories to config.yaml.")
+    ing = config.get("ingest", {})
+    targets = [ing.get("fc2_target")] if ing.get("fc2_target") else []
+    if not targets:
+        # Fallback to scan_directories for backward compat
+        targets = config.get("scan_directories", [])
+    if not targets:
+        print("No targets configured. Set ingest.fc2_target in config.yaml.")
         sys.exit(1)
 
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
 
-    enrich(scan_dirs, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run)
+    enrich(targets, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

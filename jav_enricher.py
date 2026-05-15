@@ -13,46 +13,17 @@ from jav_nfo import parse_nfo, build_nfo, merge_fields, merge_actors
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm"}
 PART_RE = re.compile(r'[-_](?:part?\s*|pt\s*|cd\s*|dvd\s*|disk\s*|disc\s*)(\d+)', re.IGNORECASE)
 
-
-def find_jav_directories(scan_dirs):
-    """Walk scan_dirs and return {cid: dir_path} for all JAV directories."""
-    cid_dirs = {}
-    jav_id_re = re.compile(r'^([A-Z]+[_-]?\d{2,5})', re.IGNORECASE)
-    for base in scan_dirs:
-        if not os.path.isdir(base):
-            continue
-        for name in os.listdir(base):
-            full = os.path.join(base, name)
-            # Match directories named after JAV IDs
-            m = jav_id_re.match(name)
-            if m:
-                cid = m.group(1).upper().replace("_", "-")
-                cid_dirs[cid] = full
-            # Also match files named after JAV IDs
-            elif os.path.isfile(full):
-                stem, ext = os.path.splitext(name)
-                if ext.lower() in VIDEO_EXTS:
-                    m = jav_id_re.match(stem)
-                    if m:
-                        cid = m.group(1).upper().replace("_", "-")
-                        # Use parent dir as directory
-                        cid_dirs[cid] = base
-        # Also scan subdirectories of _Unprocessed
-        for name in os.listdir(base):
-            full = os.path.join(base, name)
-            if os.path.isdir(full):
-                m = jav_id_re.match(name)
-                if m:
-                    cid = m.group(1).upper().replace("_", "-")
-                    cid_dirs[cid] = full
-    return cid_dirs
+def _jav_id_extractor(folder_name):
+    """Extract JAV CID from folder name like 'SSIS-119' or 'CAWD-122'."""
+    m = re.match(r'^([A-Z]+[_-]?\d{2,5})', folder_name, re.IGNORECASE)
+    return m.group(1).upper().replace("_", "-") if m else None
 
 
-def enrich_jav(scan_dirs, db_path, cids=None, dry_run=False):
+def enrich_jav(targets, db_path, cids=None, dry_run=False):
     """Main JAV enrichment loop."""
     conn = connect(db_path)
     entries = get_scraped_jav(conn, source="javdb")
-    cid_dirs = find_jav_directories(scan_dirs)
+    cid_dirs = find_directories(targets, _jav_id_extractor)
 
     if cids:
         entries = [e for e in entries if str(e["cid"]) in cids]
@@ -186,14 +157,17 @@ def main():
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
-    scan_dirs = config.get("scan_directories", [])
-    if not scan_dirs:
-        print("No scan_directories in config.")
+    ing = config.get("ingest", {})
+    targets = [ing.get("jav_target")] if ing.get("jav_target") else []
+    if not targets:
+        targets = config.get("scan_directories", [])
+    if not targets:
+        print("No targets configured. Set ingest.jav_target in config.yaml.")
         sys.exit(1)
 
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
 
-    enrich_jav(scan_dirs, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run)
+    enrich_jav(targets, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
