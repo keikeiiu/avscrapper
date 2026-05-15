@@ -24,11 +24,11 @@ _TRAILING_SPACE_DOT = re.compile(r'[ .]+$')
 def _sanitize(s):
     """Replace unsafe chars, trim leading/trailing spaces/dots."""
     if not s:
-        return "unknown"
+        return "_"
     s = _UNSAFE.sub("-", s)
     s = _LEADING_SPACE_DOT.sub("", s)
     s = _TRAILING_SPACE_DOT.sub("", s)
-    return s or "unknown"
+    return s or "_"
 
 
 def _expand(structure, entry, studio_map=None, series_map=None):
@@ -41,7 +41,7 @@ def _expand(structure, entry, studio_map=None, series_map=None):
     def _slice(m):
         n = int(m.group(1))
         val = entry.get("release_date") or ""
-        return val[:n] if val else "unknown"
+        return val[:n] if val else "_"
 
     result = re.sub(r'\{premiered:(\d+)\}', _slice, result)
 
@@ -49,7 +49,7 @@ def _expand(structure, entry, studio_map=None, series_map=None):
     def _title_slice(m):
         n = int(m.group(1))
         val = _sanitize(entry.get("title") or "")
-        return val[:n] if val else "unknown"
+        return val[:n] if val else "_"
     result = re.sub(r'\{title:(\d+)\}', _title_slice, result)
 
     raw_studio = entry.get("studio") or ""
@@ -65,8 +65,8 @@ def _expand(structure, entry, studio_map=None, series_map=None):
         ("label", _sanitize(entry.get("label") or "")),
         ("series", mapped_series),
         ("director", _sanitize(entry.get("director") or "")),
-        ("premiered", entry.get("release_date") or "unknown"),
-        ("year", entry.get("year") or "unknown"),
+        ("premiered", entry.get("release_date") or "_"),
+        ("year", entry.get("year") or "_"),
         ("rating", str(entry.get("rating") or "")),
         ("actress", _sanitize(_first_actress(entry))),
     ]
