@@ -27,5 +27,7 @@ sites:
     scrape_delay_seconds: "5-20"
     user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
     cookies:
+      cf_clearance: "VuULy6ayZqgOL9ORtBRLxeE3Cl6unUwdYNjn1vgQT4E-1778849839-1.2.1.1-iTvqg7WvQI0_GftIQpRyAi3fpUk4LJ0d7_fmJXm.Jh9f4mYQFiYe9ITVqfO1aRckTUDBQTvdZWwBGITgAqfuNGjuYcTYG08t5yYH6nQfDkufxo6ZbQ8zG7ps3DmuhsrbelPW9sweYKjbYjs8wzvIIk5yLettxhxvUpV2fI94J.v.oWagLzro0VqgHR3jP4J.wLBuS52T7b8JtJplfMhqQtIH8Y.39hQ_F9djp2JIYHLwYUepJcbDqrBkjJXHmN_J3nGOEA0EabF3M2DKIpLPlGMv9TUD2no50HknKXqtdfpgGBy8AzG0soD7bztpjESMFOvV_u3Z5W.zEeb8arVc1Q"
       over18: "1"
-      # Add _jdb_session / remember_me_token after login
+      locale: "zh"
+      _jdb_session: "bo1elxHBJIuubC0ctzWmgDixXa8Pp8Q%2F1GICGqQ0f7j1gFN9IXXqcnTNDMWgeJcoa6FB9in2Zj8swwgp4zj0tWE34nFmU9iuWzifDULfSD4WRsWJNkxHf7GN2O2MMoZ3ISYOS5O2aGIYvzSHZt%2FN5pstDuKZ7NN1T1Bo1DB%2FQX8Or1gGshWV3zoBAPKZhIRzyBQ1W0pTwdWVGQiowvzCAg%2FdmjkSCigSNZ%2B5U6JqySI8xXctHZmtvx6NFAKkpdBFvJqqfobIIear3UP%2FpG%2FELzaBUUdyHSon0LCYEr%2BzlgoqHupZBsKdn%2F0F--nP%2BpgOTQRvVYs%2FB%2F--7T4S5w%2BJ24SVyKHjZDwkng%3D%3D"

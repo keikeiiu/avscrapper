@@ -11,6 +11,73 @@ from scrapers.base import BaseScraper
 
 
 class JavdbScraper(BaseScraper):
+    def scrape_pending(self, db_path, cids=None, retry_errors=False, dry_run=False):
+        """Override to use JAV-specific DB functions."""
+        from db import (connect, init_db, insert_pending_jav, upsert_scraped_jav,
+                         mark_status_jav, get_pending_jav, get_errors_jav)
+
+        init_db(db_path)
+        conn = connect(db_path)
+
+        if cids:
+            entries = [{"cid": c, "full_number": c} for c in cids]
+            for e in entries:
+                insert_pending_jav(conn, e["cid"], e["full_number"], self.source)
+        elif retry_errors:
+            entries = get_errors_jav(conn, source=self.source)
+        else:
+            entries = get_pending_jav(conn, source=self.source)
+
+        if not entries:
+            print(f"No pending entries for source '{self.source}'. Nothing to scrape.")
+            conn.close()
+            return
+
+        from scrapers.base import _delay_str
+        total = len(entries)
+        print(f"Scraping {total} entries from {self.source} (delay={_delay_str(self.delay)})...")
+        if dry_run:
+            print("[DRY RUN -- no DB writes]")
+
+        scraped = 0
+        not_found = 0
+        errors = 0
+
+        try:
+            for i, entry in enumerate(entries):
+                cid = entry["cid"]
+                print(f"[{i+1}/{total}] {cid} ... ", end="", flush=True)
+
+                if dry_run:
+                    print("SKIP (dry-run)")
+                    continue
+
+                try:
+                    data = self.search(cid)
+                except Exception as e:
+                    mark_status_jav(conn, cid, "error", str(e)[:500])
+                    print(f"ERROR: {e}")
+                    errors += 1
+                    self._rate_limit()
+                    continue
+
+                if data is None:
+                    mark_status_jav(conn, cid, "404")
+                    print("404")
+                    not_found += 1
+                else:
+                    upsert_scraped_jav(conn, cid, data, self.source)
+                    status = (data.get("title") or "OK")[:60]
+                    print(status)
+                    scraped += 1
+
+                self._rate_limit()
+        finally:
+            conn.close()
+            self.teardown()
+
+        print(f"\nDone: {scraped} scraped, {not_found} not found, {errors} errors")
+
     def setup(self):
         from playwright.sync_api import sync_playwright
 
@@ -21,11 +88,19 @@ class JavdbScraper(BaseScraper):
             viewport={"width": 1920, "height": 1080},
         )
         if self.cookies:
-            context.add_cookies([
-                {"name": k, "value": v, "domain": ".javdb.com", "path": "/"}
-                for k, v in self.cookies.items() if v
-            ])
+            for k, v in self.cookies.items():
+                if not v:
+                    continue
+                context.add_cookies([{
+                    "name": k, "value": v,
+                    "domain": "javdb.com",
+                    "path": "/",
+                }])
         self._page = context.new_page()
+
+        # Visit homepage to establish Cloudflare / cookie context
+        self._page.goto(self.base_url + "/", timeout=30000, wait_until="domcontentloaded")
+        self._page.wait_for_timeout(3000)
 
     def teardown(self):
         if hasattr(self, "_browser") and self._browser:
@@ -65,20 +140,27 @@ class JavdbScraper(BaseScraper):
 
     def _find_result(self, cid):
         """Find the correct result link in search listings by matching the ID."""
-        items = self._page.query_selector_all(".movie-list .item")
-        for item in items:
-            uid_el = item.query_selector(".uid")
-            if not uid_el:
-                continue
-            uid = uid_el.inner_text().strip().upper()
-            if cid in uid or uid in cid:
-                link = item.query_selector("a[href*='/v/']")
-                if link:
+        # Search results are <a href="/v/XXXX"> with <strong>ID</strong> inside
+        links = self._page.query_selector_all("a[href*='/v/']")
+        for link in links:
+            strong = link.query_selector("strong")
+            if strong:
+                uid = strong.inner_text().strip().upper()
+                if cid == uid:
                     href = link.get_attribute("href")
+                    if href:
+                        if href.startswith("/"):
+                            return self.base_url + href
+                        return href
+        # Fallback: try any link containing the cid in text or href
+        for link in links:
+            text = link.inner_text().upper()
+            if cid in text:
+                href = link.get_attribute("href")
+                if href and "/v/" in href:
                     if href.startswith("/"):
                         return self.base_url + href
                     return href
-        # Fallback: try direct detail URL
         return None
 
     def _extract_page(self, cid, url):
@@ -88,86 +170,112 @@ class JavdbScraper(BaseScraper):
             "url": url,
         }
 
-        panel = self._page.query_selector(".movie-panel-info")
-        if not panel:
-            panel = self._page.query_selector("body")
-
-        if not panel:
-            return data
-
-        # Title — from <title> tag or h1
+        # Title — from <title> tag
         title_el = self._page.query_selector("title")
         if title_el:
             raw = title_el.inner_text().strip()
-            raw = re.sub(r'\s*\|\s*JavDB.*$', '', raw)
-            if raw:
+            raw = re.sub(r'\s*\|\s*JavDB.*$', '', raw, flags=re.DOTALL)
+            if raw and raw != "JavDB 成人影片數據庫":
                 data["title"] = raw
-                data["title_en"] = None
 
-        # Studio / Label / Series / Director — from strong/span pairs
-        data["studio"] = self._field(panel, "片商")
-        data["label"] = self._field(panel, "標籤") or self._field(panel, "發行")
-        data["series"] = self._field(panel, "系列")
-        data["director"] = self._field(panel, "導演")
+        # Find the metadata nav — the one containing 番號:/日期: labels
+        navs = self._page.query_selector_all("nav")
+        nav = None
+        for n in navs:
+            if n.query_selector("xpath=.//strong[contains(text(),'番號')]"):
+                nav = n
+                break
+        # If not found, try the whole page body
+        if not nav:
+            nav = self._page.query_selector("body")
+
+        # Studio
+        data["studio"] = self._field_from_nav(nav, "片商")
+        data["label"] = self._field_from_nav(nav, "標籤") or self._field_from_nav(nav, "發行") or data["studio"]
+        data["series"] = self._field_from_nav(nav, "系列")
+        data["director"] = self._field_from_nav(nav, "導演")
 
         # Release date
-        raw_date = self._field(panel, "日期")
+        raw_date = self._field_from_nav(nav, "日期") if nav else None
         if raw_date:
             data["release_date"] = raw_date.replace("/", "-")
             data["year"] = raw_date[:4] if len(raw_date) >= 4 else None
 
         # Runtime
-        raw_runtime = self._field(panel, "時長")
+        raw_runtime = self._field_from_nav(nav, "時長") if nav else None
         if raw_runtime:
             data["runtime"] = raw_runtime
             data["runtime_seconds"] = _parse_jav_runtime(raw_runtime)
 
-        # Rating
-        score_el = panel.query_selector(".score-stars")
-        if score_el:
-            score_text = score_el.evaluate("el => el.parentElement?.textContent?.trim() || ''")
-            if score_text:
-                parts = score_text.split()
-                if parts:
-                    try:
-                        data["rating"] = float(parts[0])
-                    except ValueError:
-                        pass
-                if len(parts) > 1:
-                    try:
-                        data["votes"] = int(parts[1].replace(",", ""))
-                    except ValueError:
-                        pass
+        # Rating — from "評分: ★★★★★ 4.16分, 由236人評價"
+        if nav:
+            rating_text = self._field_from_nav(nav, "評分")
+            if rating_text:
+                m = re.search(r'([\d.]+)分', rating_text)
+                if m:
+                    data["rating"] = float(m.group(1))
+                m_votes = re.search(r'(\d+)人評價', rating_text)
+                if m_votes:
+                    data["votes"] = int(m_votes.group(1))
 
-        # Actors
-        actor_els = panel.query_selector_all("a[href*='/actors/']")
-        actors = []
-        for a in actor_els:
-            name = a.inner_text().strip()
-            if name:
-                actors.append({"name": name, "thumb": ""})
-        data["actors"] = actors
+        # Actors — links to /actors/*
+        if nav:
+            actor_els = nav.query_selector_all("a[href*='/actors/']")
+            actors = []
+            for a in actor_els:
+                name = a.inner_text().strip()
+                if name:
+                    actors.append({"name": name, "thumb": ""})
+            data["actors"] = actors
 
-        # Genres / tags
-        tag_els = panel.query_selector_all("a[href*='/tags/']")
-        data["genres"] = [t.inner_text().strip() for t in tag_els if t.inner_text().strip()]
+        # Genres — links to /tags? after 類別: label
+        if nav:
+            tag_els = nav.query_selector_all("a[href*='/tags?']")
+            data["genres"] = [t.inner_text().strip() for t in tag_els if t.inner_text().strip()]
 
-        # Cover
-        img = panel.query_selector("img.video-cover")
-        if not img:
-            img = self._page.query_selector(".column-video-cover img")
-        if img:
-            src = img.get_attribute("src")
-            if src and not src.startswith("data:"):
+        # Cover — first large image on the page
+        imgs = self._page.query_selector_all("img")
+        for img in imgs:
+            src = img.get_attribute("src") or ""
+            if "jdbstatic.com/covers" in src:
                 data["cover_url"] = src
+                break
 
         # Fanart / samples
-        sample_els = self._page.query_selector_all("a[href*='/samples/']")
+        sample_els = self._page.query_selector_all("a[href*='jdbstatic.com/samples/']")
         fanart = [a.get_attribute("href") for a in sample_els if a.get_attribute("href")]
         if fanart:
             data["fanart_urls"] = fanart
 
         return data
+
+    def _field_from_nav(self, nav, label):
+        """Extract value after a <strong>label:</strong> in the nav.
+        Uses relative XPath from nav, then gets next sibling text/link."""
+        if not nav:
+            return None
+        # Use relative XPath starting from nav
+        strong = nav.query_selector(f"xpath=.//strong[contains(text(),'{label}')]")
+        if not strong:
+            return None
+        # Get next sibling's text content
+        text = strong.evaluate("""el => {
+            let node = el.nextSibling;
+            while (node) {
+                if (node.nodeType === 3 && node.textContent.trim())  // TEXT_NODE
+                    return node.textContent.trim();
+                if (node.nodeType === 1) {  // ELEMENT_NODE
+                    let t = node.textContent.trim();
+                    if (t) return t;
+                }
+                node = node.nextSibling;
+            }
+            // If no sibling, try parent text minus label
+            let p = el.parentElement?.textContent || '';
+            p = p.replace(el.textContent, '').trim();
+            return p || null;
+        }""")
+        return text if text else None
 
     def _field(self, panel, label):
         """Extract value from a strong-text + span pattern: <strong>label:</strong> <span>value</span>"""
