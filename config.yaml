@@ -9,6 +9,12 @@ scan_directories:
   - "F:/AV/Japanese/FC2"
   - "F:/AV/Japanese/JAV/_Unprocessed"
 
+# Ingest defaults
+ingest:
+  source: "C:/Users/keiwa/Downloads/new fc2"
+  fc2_target: "C:/Users/keiwa/Downloads/processed_"
+  jav_target: "C:/Users/keiwa/Downloads/processed_"
+
 # Per-site scraper configuration
 sites:
   fc2ppvdb:

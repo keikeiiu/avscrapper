@@ -148,6 +148,7 @@ FC2-PPV-3173579[UNCENSORED]/
 6. ✅ `fc2_nfo.py` — Kodi-standard NFO builder
 7. ✅ `fc2_enricher.py` — writes `movie.nfo` per folder
 8. ⬜ Duration audit (deferred, no MP4 access)
+9. ⬜ `ingest.py` — auto-detect type, organize files, seed DB
 
 ## Verification
 
