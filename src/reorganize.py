@@ -76,6 +76,7 @@ def _expand(structure, entry, studio_map=None, series_map=None):
         ("year", entry.get("year") or "_"),
         ("rating", str(entry.get("rating") or "")),
         ("actress", _sanitize(_first_actress(entry))),
+        ("code", _code_prefix(entry.get("cid", ""))),
     ]
 
     for key, val in replacements:
@@ -167,6 +168,12 @@ def reorganize(config_path, dry_run=False, cids=None):
         _process_type("JAV", entries, jav_dirs, jav_structure, target_base, conn, dry_run, cids, studio_map, series_map)
 
     conn.close()
+
+
+def _code_prefix(cid):
+    """Extract letter prefix from JAV ID: 'SSIS-119' → 'SSIS'."""
+    m = re.match(r'^([A-Z]+)', str(cid))
+    return m.group(1) if m else cid
 
 
 def _fc2_extractor(name):
