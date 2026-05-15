@@ -6,7 +6,7 @@
 
 services:
   scraper:
-    image: keiwarcraft/avscraper:latest
+    image: keikeiiu/avscraper:latest
     build: .  # fallback: builds locally if image not available
     container_name: avscraper
     volumes:
