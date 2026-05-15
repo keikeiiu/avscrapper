@@ -69,7 +69,7 @@ def clean_filename(info):
     return f"{name}{ext}"
 
 
-def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False):
+def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False, confirm=False):
     from db import connect, init_db, insert_pending, insert_pending_jav
 
     if not os.path.isdir(source):
@@ -113,47 +113,87 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     # Auto-assign part numbers for duplicate CIDs without explicit markers
     _assign_parts(results)
 
+    # Phase 1: always preview
     print(f"Found {len(files)} files in {source}\n")
-    moved = 0
-    skipped = 0
-    unknown = 0
+    to_move = 0
+    to_skip = 0
+    to_unknown = 0
 
     for r in results:
         fname = r["original"]
-        src_path = os.path.join(source, fname)
 
         if r["type"] is None:
             print(f"  ? {fname}")
-            unknown += 1
+            to_unknown += 1
+            continue
+
+        if r["type"] == "fc2":
+            folder_name = f"FC2-PPV-{r['cid']}"
+            target_base = fc2_target
+        else:
+            folder_name = r["cid"]
+            target_base = jav_target
+
+        dest_dir = os.path.join(target_base, folder_name)
+        dest_path = os.path.join(dest_dir, clean_filename(r))
+
+        print(f"  {r['type'].upper():4} {r['cid']:20} → {os.path.join(folder_name, clean_filename(r))}", end="")
+        if os.path.exists(dest_path):
+            print("  SKIP (exists)")
+            to_skip += 1
+        else:
+            print()
+            to_move += 1
+
+    auto_parts = [r for r in results if r.get("auto_part")]
+    print(f"\nPlan: {to_move} move, {to_skip} skip, {to_unknown} unknown")
+
+    if auto_parts:
+        print(f"\n⚠  {len(auto_parts)} file(s) auto-assigned part numbers (REVIEW):")
+        for r in auto_parts:
+            folder = f"FC2-PPV-{r['cid']}" if r['type'] == 'fc2' else r['cid']
+            print(f"    {r['original']}  →  {folder}/{clean_filename(r)}")
+
+    if to_move == 0:
+        print("\nNothing to move.")
+        conn.close()
+        return
+
+    if dry_run:
+        conn.close()
+        return
+
+    # Phase 2: confirm and execute
+    if not confirm:
+        try:
+            response = input(f"\nMove {to_move} file(s)? [y/N] ").strip().lower()
+        except EOFError:
+            response = "n"
+        if response not in ("y", "yes"):
+            print("Aborted.")
+            conn.close()
+            return
+
+    print(f"\nMoving {to_move} file(s)...")
+    moved = 0
+    skipped = 0
+    for r in results:
+        if r["type"] is None:
             continue
 
         target_base = fc2_target if r["type"] == "fc2" else jav_target
-        if r["type"] == "fc2":
-            folder_name = f"FC2-PPV-{r['cid']}"
-        else:
-            folder_name = r["cid"]
-
-        dest_dir = os.path.join(target_base, folder_name)
-        new_name = clean_filename(r)
-        dest_path = os.path.join(dest_dir, new_name)
-
-        print(f"  {r['type'].upper():4} {r['cid']:20} → {os.path.join(folder_name, new_name)}", end="")
+        folder = f"FC2-PPV-{r['cid']}" if r["type"] == "fc2" else r["cid"]
+        dest_dir = os.path.join(target_base, folder)
+        dest_path = os.path.join(dest_dir, clean_filename(r))
 
         if os.path.exists(dest_path):
-            print("  SKIP (exists)")
             skipped += 1
             continue
 
-        print()  # newline after status
-
-        if dry_run:
-            moved += 1
-            continue
-
+        src_path = os.path.join(source, r["original"])
         os.makedirs(dest_dir, exist_ok=True)
         shutil.move(src_path, dest_path)
 
-        # Seed DB
         full_number = f"FC2-PPV-{r['cid']}" if r["type"] == "fc2" else r["cid"]
         if r["type"] == "fc2":
             insert_pending(conn, r["cid"], full_number, "fc2ppvdb",
@@ -161,23 +201,13 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         else:
             insert_pending_jav(conn, r["cid"], full_number, "javdb",
                              f"https://javdb.com/search?q={r['cid']}&f=all")
-
         moved += 1
 
     conn.close()
-
-    auto_parts = [r for r in results if r.get("auto_part")]
-    print(f"\nDone: {moved} moved" + (" (dry-run)" if dry_run else "") +
-          (f", {skipped} skipped" if skipped else "") +
-          (f", {unknown} unknown" if unknown else ""))
-
-    if auto_parts:
-        print(f"\n⚠  {len(auto_parts)} file(s) auto-assigned part numbers (REVIEW):")
-        for r in auto_parts:
-            print(f"    {r['original']}  →  {clean_filename(r)}")
+    print(f"Done: {moved} moved, {skipped} skipped")
 
     # Optional: trigger scraper
-    if scrape and not dry_run:
+    if scrape:
         print("\nScraping new entries...")
         from subprocess import run
         if any(r["type"] == "fc2" for r in results if r["type"]):
@@ -185,7 +215,7 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         if any(r["type"] == "jav" for r in results if r["type"]):
             run([sys.executable, "scrapers/javdb_scraper.py"], cwd=os.path.dirname(__file__))
 
-    if enrich and not dry_run:
+    if enrich:
         print("\nWriting NFOs...")
         from subprocess import run
         if any(r["type"] == "fc2" for r in results if r["type"]):
@@ -200,6 +230,7 @@ def main():
     p.add_argument("--fc2-target", help="Target directory for FC2 videos")
     p.add_argument("--jav-target", help="Target directory for JAV videos")
     p.add_argument("--dry-run", action="store_true", help="Preview only, no moves")
+    p.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
     p.add_argument("--scrape", action="store_true", help="Run scrapers after ingest")
     p.add_argument("--enrich", action="store_true", help="Write NFOs after ingest")
     args = p.parse_args()
@@ -230,7 +261,8 @@ def main():
            config.get("db_path", "fc2_data.db"),
            dry_run=args.dry_run,
            scrape=args.scrape,
-           enrich=args.enrich)
+           enrich=args.enrich,
+           confirm=args.yes)
 
 
 if __name__ == "__main__":
