@@ -2,7 +2,16 @@
 
 Scrapes metadata → SQLite → Kodi-compliant NFO files.
 
-## Quick Start
+## Quick Start (Docker)
+
+```bash
+cp config.example.yaml config.yaml   # then edit
+docker compose up                    # auto-build + run
+docker compose run scraper enrich javdb
+docker compose run scraper reorganize --dry-run
+```
+
+## Quick Start (Local)
 
 ```bash
 # 1. Create config

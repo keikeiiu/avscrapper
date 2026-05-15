@@ -1,0 +1,24 @@
+# AV Scraper — one-command setup
+# docker compose up              → build + run ingest
+# docker compose run scraper scrape javdb --delay "5-20"
+# docker compose run scraper enrich javdb
+# docker compose run scraper reorganize --dry-run
+
+services:
+  scraper:
+    build: .
+    container_name: avscraper
+    volumes:
+      - ./downloads:/app/downloads
+      - ./processed:/app/processed
+      - ./reorganized:/app/reorganized
+      - ./config.yaml:/app/config.yaml:ro
+      - av_data:/app
+    environment:
+      - AV_CONFIG=/app/config.yaml
+    stdin_open: true
+    tty: true
+    entrypoint: ["python", "/app/avscraper.py"]
+
+volumes:
+  av_data:
