@@ -106,9 +106,61 @@ def main():
             print(f"Unknown site: {site}")
     elif command == "reorganize":
         _run_script("reorganize.py", *extra)
+    elif command == "setup":
+        _setup(config, config_path)
     else:
         print(f"Unknown command: {command}")
         print(__doc__)
+
+
+def _setup(config, config_path):
+    """First-run setup: create config, check deps, create dirs."""
+    import shutil
+
+    # 1. Auto-copy config if using example
+    if os.path.basename(config_path) == "config.example.yaml":
+        target = os.path.join(os.path.dirname(config_path), "config.yaml")
+        if not os.path.exists(target):
+            shutil.copy(config_path, target)
+            print(f"Created config.yaml from example. Edit paths + cookies:")
+            print(f"  {target}")
+        else:
+            print("config.yaml already exists.")
+    else:
+        print(f"Using: {config_path}")
+
+    # 2. Check playwright
+    try:
+        from playwright.sync_api import sync_playwright
+        p = sync_playwright().start()
+        try:
+            b = p.chromium.launch(headless=True)
+            b.close()
+            print("Playwright + Chromium: OK")
+        except Exception:
+            print("Chromium not installed. Run: playwright install chromium")
+        p.stop()
+    except ImportError:
+        print("Playwright not installed. Run: pip install playwright && playwright install chromium")
+
+    # 3. Create directories from config
+    ingest = config.get("ingest", {})
+    reorg = config.get("reorganize", {})
+    dirs = [
+        ingest.get("source"),
+        ingest.get("fc2_target"),
+        ingest.get("jav_target"),
+        reorg.get("target"),
+        config.get("report_dir"),
+    ]
+    for d in dirs:
+        if d and not os.path.isabs(d):
+            d = os.path.join(HERE, d)
+        if d:
+            os.makedirs(d, exist_ok=True)
+    print("Directories created from config.")
+    print("\nSetup complete. Drop videos into your source directory and run:")
+    print("  python avscraper.py ingest --dry-run")
 
 
 if __name__ == "__main__":
