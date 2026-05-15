@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import connect
 
 # Windows-unsafe filename chars
-_UNSAFE = re.compile(r'[:*?"<>|]')
+_UNSAFE = re.compile(r'[:*?"<>|\\/]')
 _LEADING_SPACE_DOT = re.compile(r'^[ .]+')
 _TRAILING_SPACE_DOT = re.compile(r'[ .]+$')
 
