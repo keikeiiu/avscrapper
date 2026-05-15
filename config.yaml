@@ -2,6 +2,7 @@
 # Cookies captured 2026-05-13 from authenticated browser session
 
 db_path: "av_data.db"
+report_dir: "reports"
 
 # Ingest defaults
 ingest:

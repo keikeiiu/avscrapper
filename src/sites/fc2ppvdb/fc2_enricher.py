@@ -138,6 +138,7 @@ def enrich(targets, db_path, cids=None, dry_run=False, report_dir=None):
     report_lines.append(f"\n**Summary:** {updated} updated, {skipped} skipped, {no_dir} no directory")
 
     report_path = os.path.join(report_dir, "enrichment-report.md")
+    os.makedirs(report_dir, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
     print(f"\nDone: {updated} updated, {skipped} skipped, {no_dir} no directory")
@@ -173,9 +174,13 @@ def main():
         print("No targets configured. Set ingest.fc2_target in config.yaml.")
         sys.exit(1)
 
+    report_dir = config.get("report_dir")
+    if report_dir and not os.path.isabs(report_dir):
+        report_dir = os.path.normpath(os.path.join(os.path.dirname(config_path), report_dir))
+
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
 
-    enrich(targets, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run)
+    enrich(targets, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run, report_dir=report_dir)
 
 
 if __name__ == "__main__":

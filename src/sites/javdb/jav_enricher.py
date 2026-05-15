@@ -20,8 +20,10 @@ def _jav_id_extractor(folder_name):
     return m.group(1).upper().replace("_", "-") if m else None
 
 
-def enrich_jav(targets, db_path, cids=None, dry_run=False):
+def enrich_jav(targets, db_path, cids=None, dry_run=False, report_dir=None):
     """Main JAV enrichment loop."""
+    if report_dir is None:
+        report_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     conn = connect(db_path)
     entries = get_scraped_jav(conn, source="javdb")
     cid_dirs = find_directories(targets, _jav_id_extractor)
@@ -138,7 +140,8 @@ def enrich_jav(targets, db_path, cids=None, dry_run=False):
     conn.close()
 
     report_lines.append(f"\n**Summary:** {updated} updated, {skipped} skipped, {no_dir} no directory")
-    report_path = os.path.join(os.path.dirname(__file__), "jav-enrichment-report.md")
+    report_path = os.path.join(report_dir, "jav-enrichment-report.md")
+    os.makedirs(report_dir, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
     print(f"\nDone: {updated} updated, {skipped} skipped, {no_dir} no directory")
@@ -171,9 +174,13 @@ def main():
         print("No targets configured. Set ingest.jav_target in config.yaml.")
         sys.exit(1)
 
+    report_dir = config.get("report_dir")
+    if report_dir and not os.path.isabs(report_dir):
+        report_dir = os.path.normpath(os.path.join(os.path.dirname(config_path), report_dir))
+
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
 
-    enrich_jav(targets, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run)
+    enrich_jav(targets, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run, report_dir=report_dir)
 
 
 if __name__ == "__main__":

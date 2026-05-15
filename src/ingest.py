@@ -121,7 +121,7 @@ def clean_filename(info):
     return f"{name}{ext}"
 
 
-def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False, confirm=False):
+def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False, confirm=False, report_dir=None):
     from db import connect, init_db, insert_pending, insert_pending_jav
 
     if not os.path.isdir(source):
@@ -292,7 +292,11 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
 
     # Write audit report
     report_lines = [_ingest_report(source, fc2_target, jav_target, normal, skips, unknowns)]
-    report_path = os.path.join(source, "_ingest-report.md")
+    if report_dir:
+        os.makedirs(report_dir, exist_ok=True)
+        report_path = os.path.join(report_dir, "ingest-report.md")
+    else:
+        report_path = os.path.join(source, "_ingest-report.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
     print(f"Report: {report_path}")
@@ -354,12 +358,17 @@ def main():
     fc2_target = fc2_target or os.path.join(source, "_fc2")
     jav_target = jav_target or os.path.join(source, "_jav")
 
+    report_dir = config.get("report_dir")
+    if report_dir and not os.path.isabs(report_dir):
+        report_dir = os.path.normpath(os.path.join(os.path.dirname(config_path), report_dir))
+
     ingest(source, fc2_target, jav_target,
            config.get("db_path", "av_data.db"),
            dry_run=args.dry_run,
            scrape=args.scrape,
            enrich=args.enrich,
-           confirm=args.yes)
+           confirm=args.yes,
+           report_dir=report_dir)
 
 
 if __name__ == "__main__":
