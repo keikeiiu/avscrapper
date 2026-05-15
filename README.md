@@ -1,6 +1,6 @@
-# FC2 PPV Scraper & NFO Enricher
+# AV Scraper & NFO Enricher
 
-Scrapes metadata from [fc2ppvdb.com](https://fc2ppvdb.com) → SQLite → Kodi-compliant NFO files.
+Scrapes metadata from [fc2ppvdb.com](https://fc2ppvdb.com) and [javdb.com](https://javdb.com) → SQLite → Kodi-compliant NFO files.
 
 ## Setup
 
@@ -93,10 +93,37 @@ python fc2_enricher.py --dry-run
 
 **Merge rules:** Never overwrites existing cover/poster. Tags are additive. Empty existing fields are filled from scraped data.
 
+## JavDB (JAV)
+
+Scrape JAV metadata from javdb.com and write Kodi NFOs.
+
+```bash
+# Scrape specific JAV IDs
+python scrapers/javdb_scraper.py --ids SSIS-119,CAWD-122 --delay "5-20"
+
+# Enrich (write NFOs)
+python jav_enricher.py --ids SSIS-119
+
+# Dry-run preview
+python jav_enricher.py --dry-run
+```
+
+### JAV NFO Format
+
+Additional fields vs FC2: `<label>`, `<series>`, `<director>`, `<year>`, `<rating>`, `<votes>`, nested `<actor><name><thumb>`, `<art><fanart>`.
+
+### JavDB Auth
+
+- Public: `over18: 1` cookie (bypass age gate)
+- Full: `_jdb_session` + `remember_me_token` (login required for VIP content)
+
+Cookies go in `config.yaml` under `sites.javdb.cookies`.
+
 ## Checking Progress
 
 ```bash
 sqlite3 fc2_data.db "SELECT status, COUNT(*) FROM fc2_entries GROUP BY status"
+sqlite3 fc2_data.db "SELECT status, COUNT(*) FROM jav_entries GROUP BY status"
 ```
 
 Output: `pending` / `scraped` / `404` / `error`
@@ -105,19 +132,22 @@ Output: `pending` / `scraped` / `404` / `error`
 
 | File | Purpose |
 |------|---------|
-| `fc2_config.yaml` | Config: cookies, delays, scan dirs, DB path |
-| `fc2_db.py` | SQLite schema + CRUD |
+| `config.yaml` | Config: cookies, delays, scan dirs, DB path |
+| `db.py` | SQLite schema + CRUD (fc2 + jav tables) |
 | `scrapers/base.py` | Shared framework: CLI, rate-limit, DB writes |
 | `scrapers/fc2ppvdb_scraper.py` | fc2ppvdb.com parser (Playwright) |
-| `fc2_enricher.py` | Read DB → write Kodi NFOs to disk |
-| `fc2_nfo.py` | NFO XML parse / build / merge |
+| `scrapers/javdb_scraper.py` | javdb.com parser (Playwright) |
+| `fc2_enricher.py` | FC2: read DB → write NFOs |
+| `jav_enricher.py` | JAV: read DB → write NFOs |
+| `fc2_nfo.py` | FC2 NFO XML parse / build / merge |
+| `jav_nfo.py` | JAV NFO XML parse / build / merge |
 | `F-drive-FC2-list.md` | 617 FC2 IDs from F drive |
 
 ## Cookie Refresh
 
 If scraper returns 404 for known-valid IDs, cookies have expired.
 
-1. Log into https://fc2ppvdb.com in Chrome
-2. F12 → Application → Cookies → fc2ppvdb.com
-3. Copy: `fc2ppvdb_session`, `XSRF-TOKEN`, `remember_web_*`, `cf_clearance`, `age_pass`, `stype`
-4. Update `fc2_config.yaml`
+1. Log into the target site in Chrome
+2. F12 → Application → Cookies → site domain
+3. Copy the session/auth cookies
+4. Update `config.yaml`
