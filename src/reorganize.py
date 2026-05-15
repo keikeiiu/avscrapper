@@ -98,19 +98,18 @@ def _find_source_dirs(targets, id_extractor):
     for base in targets:
         if not os.path.isdir(base):
             continue
-        for name in os.listdir(base):
-            full = os.path.join(base, name)
-            if not os.path.isdir(full):
-                continue
-            cid = id_extractor(name)
-            if cid is None:
-                continue
-            has_video = any(
-                os.path.splitext(f)[1].lower() in VIDEO_EXTS
-                for f in os.listdir(full) if os.path.isfile(os.path.join(full, f))
-            )
-            if has_video or cid not in cid_dirs:
-                cid_dirs[cid] = (base, name)
+        for root, dirs, files in os.walk(base):
+            for name in dirs:
+                cid = id_extractor(name)
+                if cid is None:
+                    continue
+                full = os.path.join(root, name)
+                has_video = any(
+                    os.path.splitext(f)[1].lower() in VIDEO_EXTS
+                    for f in os.listdir(full) if os.path.isfile(os.path.join(full, f))
+                )
+                if cid not in cid_dirs or (has_video and len(root) < len(cid_dirs[cid][0])):
+                    cid_dirs[cid] = (root, name)
     return cid_dirs
 
 
