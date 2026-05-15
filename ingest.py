@@ -349,7 +349,7 @@ def main():
     jav_target = jav_target or os.path.join(source, "_jav")
 
     ingest(source, fc2_target, jav_target,
-           config.get("db_path", "fc2_data.db"),
+           config.get("db_path", "av_data.db"),
            dry_run=args.dry_run,
            scrape=args.scrape,
            enrich=args.enrich,

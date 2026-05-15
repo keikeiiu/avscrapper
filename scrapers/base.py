@@ -189,8 +189,8 @@ class BaseScraper(ABC):
         if args.seed_only:
             from db import connect, init_db, insert_pending
 
-            init_db(config.get("db_path", "fc2_data.db"))
-            conn = connect(config.get("db_path", "fc2_data.db"))
+            init_db(config.get("db_path", "av_data.db"))
+            conn = connect(config.get("db_path", "av_data.db"))
             if cids:
                 for c in cids:
                     insert_pending(conn, c, f"FC2-PPV-{c}", site_name)
@@ -203,7 +203,7 @@ class BaseScraper(ABC):
         scraper = cls(site_config)
 
         scraper.scrape_pending(
-            db_path=config.get("db_path", "fc2_data.db"),
+            db_path=config.get("db_path", "av_data.db"),
             cids=cids,
             retry_errors=args.retry_errors,
             dry_run=args.dry_run,

@@ -172,7 +172,7 @@ def main():
 
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
 
-    enrich(scan_dirs, config.get("db_path", "fc2_data.db"), cids=cids, dry_run=args.dry_run)
+    enrich(scan_dirs, config.get("db_path", "av_data.db"), cids=cids, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
