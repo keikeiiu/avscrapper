@@ -151,7 +151,7 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="Preview changes, no writes")
     args = p.parse_args()
 
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     config_path = os.path.join(base_dir, "config.yaml")
     if not os.path.exists(config_path):
         config_path = os.path.join(base_dir, "fc2_config.yaml")

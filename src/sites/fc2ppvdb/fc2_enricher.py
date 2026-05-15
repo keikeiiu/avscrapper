@@ -29,8 +29,10 @@ def _fc2_id_extractor(folder_name):
     return folder_name.replace("FC2-PPV-", "").split("[")[0].split("_")[0].strip()
 
 
-def enrich(targets, db_path, cids=None, dry_run=False):
+def enrich(targets, db_path, cids=None, dry_run=False, report_dir=None):
     """Main enrichment loop."""
+    if report_dir is None:
+        report_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     conn = connect(db_path)
     entries = get_scraped(conn, source="fc2ppvdb")
     cid_dirs = find_directories(targets, _fc2_id_extractor)
@@ -135,7 +137,7 @@ def enrich(targets, db_path, cids=None, dry_run=False):
 
     report_lines.append(f"\n**Summary:** {updated} updated, {skipped} skipped, {no_dir} no directory")
 
-    report_path = os.path.join(os.path.dirname(__file__), "enrichment-report.md")
+    report_path = os.path.join(report_dir, "enrichment-report.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
     print(f"\nDone: {updated} updated, {skipped} skipped, {no_dir} no directory")
@@ -148,7 +150,7 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="Preview changes, no writes")
     args = p.parse_args()
 
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     config_path = os.path.join(base_dir, "config.yaml")
     if not os.path.exists(config_path):
         config_path = os.path.join(base_dir, "fc2_config.yaml")

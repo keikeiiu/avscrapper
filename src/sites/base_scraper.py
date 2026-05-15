@@ -165,7 +165,7 @@ class BaseScraper(ABC):
         parser = cls.build_argparser()
         args = parser.parse_args(argv)
 
-        config_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_parent = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         config_path = os.path.join(config_parent, "config.yaml")
         if not os.path.exists(config_path):
             config_path = os.path.join(config_parent, "fc2_config.yaml")
