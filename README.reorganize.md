@@ -9,8 +9,8 @@ Add to `config.yaml`:
 ```yaml
 reorganize:
   target: "C:/Users/keiwa/Downloads/reorganized_"
-  fc2_template: "{seller}/{premiered:4}/FC2-PPV-{cid}"
-  jav_template: "{studio}/{series}/{cid}"
+  fc2_template: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid}"
+  jav_template: "JAV/{studio}/{series}/{cid}"
 ```
 
 ## Template Variables
@@ -34,19 +34,16 @@ reorganize:
 
 ```yaml
 # FC2 — By seller then year
-fc2_template: "{seller}/{premiered:4}/FC2-PPV-{cid}"
-
-# FC2 — Flat with title
-fc2_template: "FC2-PPV-{cid} - {title}"
+fc2_template: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid}"
 
 # JAV — Studio → Series → ID
-jav_template: "{studio}/{series}/{cid}"
+jav_template: "JAV/{studio}/{series}/{cid}"
 
 # JAV — Director-focused
-jav_template: "{director}/{premiered:4}/{cid}"
+jav_template: "JAV/{director}/{premiered:4}/{cid}"
 
 # JAV — Studio → Actress → ID
-jav_template: "{studio}/{actress}/{cid}"
+jav_template: "JAV/{studio}/{actress}/{cid}"
 ```
 
 ## Safety
