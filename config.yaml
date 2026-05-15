@@ -10,6 +10,12 @@ ingest:
   fc2_target: "C:/Users/keiwa/Downloads/processed_"
   jav_target: "C:/Users/keiwa/Downloads/processed_"
 
+# Folder reorganizer
+reorganize:
+  target: "C:/Users/keiwa/Downloads/reorganized_"
+  fc2_template: "{seller}/{premiered:4}/FC2-PPV-{cid}"
+  jav_template: "{studio}/{series}/{cid}"
+
 # Per-site scraper configuration
 sites:
   fc2ppvdb:

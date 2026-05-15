@@ -43,6 +43,18 @@ sqlite3 fc2_data.db "SELECT source, status, COUNT(*) FROM fc2_entries GROUP BY s
 sqlite3 fc2_data.db "SELECT source, status, COUNT(*) FROM jav_entries GROUP BY source, status"
 ```
 
+## Reorganizer
+
+Move organized folders into a metadata-driven hierarchy.
+
+```bash
+python reorganize.py --dry-run     # preview
+python reorganize.py               # execute
+python reorganize.py --ids 409694  # specific entries
+```
+
+See [README.reorganize.md](README.reorganize.md) for template config.
+
 ## Delay Format
 
 | Value | Behavior |
