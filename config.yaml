@@ -14,7 +14,7 @@ ingest:
 reorganize:
   target: "C:/Users/keiwa/Downloads/reorganized_"
   fc2_structure: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid} - {title:50}"
-  jav_structure: "JAV/{studio}/{series:40}/{cid} - {title:50}"
+  jav_structure: "JAV/{studio}/{code}/{series:40}/{cid} - {title:50}"
   studio_map:
     # SOD group → canonical
     SODクリエイト: SOD Create
