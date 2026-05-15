@@ -67,7 +67,11 @@ class JavdbScraper(BaseScraper):
                     not_found += 1
                 elif data.get("title") is None:
                     mark_status_jav(conn, cid, "login_required")
-                    print("VIP only")
+                    print("VIP/login required")
+                    not_found += 1
+                elif not data.get("title"):
+                    mark_status_jav(conn, cid, "404")
+                    print("404 (not found)")
                     not_found += 1
                 else:
                     # Auto-detect region
@@ -178,7 +182,7 @@ class JavdbScraper(BaseScraper):
         # Check for login/VIP wall (the actual wall message, not the nav button)
         body = self._page.evaluate("document.body.innerText")
         if "此內容需要登入才能查看或操作" in body or "需要VIP權限才能訪問此內容" in body:
-            data["title"] = None  # mark as login-required
+            data["title"] = None  # None = login-required
             return data
 
         # Title — from <title> tag
@@ -188,6 +192,10 @@ class JavdbScraper(BaseScraper):
             raw = re.sub(r'\s*\|\s*JavDB.*$', '', raw, flags=re.DOTALL)
             if raw and raw != "JavDB 成人影片數據庫":
                 data["title"] = raw
+
+        # If still no title, mark as not-found (distinct from login-wall None)
+        if "title" not in data or not data["title"]:
+            data["title"] = ""  # empty = not found
 
         # Find the metadata nav — the one containing 番號:/日期: labels
         navs = self._page.query_selector_all("nav")
