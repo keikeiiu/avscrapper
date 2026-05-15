@@ -5,8 +5,9 @@ import os
 import re
 import argparse
 import yaml
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db import connect, get_scraped, mark_status, find_directories
-from fc2_nfo import parse_nfo, build_nfo, merge_fields
+from sites.fc2ppvdb.fc2_nfo import parse_nfo, build_nfo, merge_fields
 
 
 def _parse_runtime_minutes(dur):
@@ -147,7 +148,7 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="Preview changes, no writes")
     args = p.parse_args()
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     config_path = os.path.join(base_dir, "config.yaml")
     if not os.path.exists(config_path):
         config_path = os.path.join(base_dir, "fc2_config.yaml")

@@ -302,17 +302,17 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         print("\nScraping new entries...")
         from subprocess import run
         if any(r["type"] == "fc2" for r in results if r["type"]):
-            run([sys.executable, "scrapers/fc2ppvdb_scraper.py"], cwd=os.path.dirname(__file__))
+            run([sys.executable, "sites/fc2ppvdb/fc2ppvdb_scraper.py"], cwd=os.path.dirname(__file__))
         if any(r["type"] == "jav" for r in results if r["type"]):
-            run([sys.executable, "scrapers/javdb_scraper.py"], cwd=os.path.dirname(__file__))
+            run([sys.executable, "sites/javdb/javdb_scraper.py"], cwd=os.path.dirname(__file__))
 
     if enrich:
         print("\nWriting NFOs...")
         from subprocess import run
         if any(r["type"] == "fc2" for r in results if r["type"]):
-            run([sys.executable, "fc2_enricher.py"], cwd=os.path.dirname(__file__))
+            run([sys.executable, "sites/fc2ppvdb/fc2_enricher.py"], cwd=os.path.dirname(__file__))
         if any(r["type"] == "jav" for r in results if r["type"]):
-            run([sys.executable, "jav_enricher.py"], cwd=os.path.dirname(__file__))
+            run([sys.executable, "sites/javdb/jav_enricher.py"], cwd=os.path.dirname(__file__))
 
 
 def main():

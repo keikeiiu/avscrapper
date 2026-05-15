@@ -6,8 +6,9 @@ import re
 import argparse
 import json
 import yaml
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db import connect, get_scraped_jav, mark_status_jav
-from jav_nfo import parse_nfo, build_nfo, merge_fields, merge_actors
+from sites.javdb.jav_nfo import parse_nfo, build_nfo, merge_fields, merge_actors
 
 
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm"}
@@ -150,7 +151,7 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="Preview changes, no writes")
     args = p.parse_args()
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     config_path = os.path.join(base_dir, "config.yaml")
     if not os.path.exists(config_path):
         config_path = os.path.join(base_dir, "fc2_config.yaml")

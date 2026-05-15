@@ -5,9 +5,9 @@ import os
 import re
 import json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from scrapers.base import BaseScraper
+from sites.base_scraper import BaseScraper
 
 
 class JavdbScraper(BaseScraper):
@@ -33,7 +33,7 @@ class JavdbScraper(BaseScraper):
             conn.close()
             return
 
-        from scrapers.base import _delay_str
+        from sites.base_scraper import _delay_str
         total = len(entries)
         print(f"Scraping {total} entries from {self.source} (delay={_delay_str(self.delay)})...")
         if dry_run:
