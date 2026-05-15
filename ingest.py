@@ -56,6 +56,58 @@ def _assign_parts(results):
             results[i]["auto_part"] = True
 
 
+def _ingest_report(source, fc2_target, jav_target, moved, skipped, unknowns):
+    """Generate markdown report of the ingest operation."""
+    from datetime import datetime
+    lines = [
+        "# Ingest Report",
+        f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Source:** {source}",
+        "",
+        f"**Moved:** {len(moved)}  |  **Skipped:** {len(skipped)}  |  **Unknown:** {len(unknowns)}",
+        "",
+    ]
+    if moved:
+        lines.append("## Moved")
+        lines.append("")
+        lines.append("| Type | ID | From | To |")
+        lines.append("|------|-----|------|----|")
+        for r in moved:
+            dest = r.get("_dest", "")
+            lines.append(f"| {r['type'].upper()} | {r['cid']} | {r['original']} | {dest} |")
+        lines.append("")
+        # Resulting folder structure
+        lines.append("## Result Structure")
+        lines.append("```")
+        # Group by target dir
+        from collections import defaultdict
+        tree = defaultdict(list)
+        for r in moved:
+            dest = r.get("_dest", "")
+            folder = os.path.dirname(dest)
+            fname = os.path.basename(dest)
+            tree[folder].append(fname)
+        for folder in sorted(tree):
+            lines.append(f"{folder}/")
+            for fname in sorted(tree[folder]):
+                lines.append(f"  ├── {fname}")
+        lines.append("```")
+        lines.append("")
+    if skipped:
+        lines.append("## Skipped (already exists)")
+        lines.append("")
+        for r in skipped:
+            lines.append(f"- {r['original']} → {r.get('_dest', '')}")
+        lines.append("")
+    if unknowns:
+        lines.append("## Unknown (not recognized)")
+        lines.append("")
+        for r in unknowns:
+            lines.append(f"- {r['original']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def clean_filename(info):
     """Return clean filename without title text."""
     cid = info["cid"]
@@ -69,7 +121,7 @@ def clean_filename(info):
     return f"{name}{ext}"
 
 
-def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False, confirm=False):
+def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False):
     from db import connect, init_db, insert_pending, insert_pending_jav
 
     if not os.path.isdir(source):
@@ -181,13 +233,8 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         conn.close()
         return
 
-    # Phase 2: auto-proceed if clean, stop if issues
-    has_issues = to_skip > 0 or to_unknown > 0 or len(auto_parts) > 0
-
-    if has_issues and not confirm:
-        print("\n⚠  Cannot proceed — issues detected. Review above and re-run with --yes to force.")
-        conn.close()
-        return
+    # Phase 2: move clean files, skip problematic ones
+    # Always proceed — just skip what can't be safely moved
 
     print(f"\nMoving {to_move} file(s)...")
     moved = 0
@@ -217,6 +264,13 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     conn.close()
     print(f"Done: {moved} moved, {skipped} skipped")
 
+    # Write audit report
+    report_lines = [_ingest_report(source, fc2_target, jav_target, normal, skips, unknowns)]
+    report_path = os.path.join(source, "_ingest-report.md")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(report_lines))
+    print(f"Report: {report_path}")
+
     # Optional: trigger scraper
     if scrape:
         print("\nScraping new entries...")
@@ -241,7 +295,6 @@ def main():
     p.add_argument("--fc2-target", help="Target directory for FC2 videos")
     p.add_argument("--jav-target", help="Target directory for JAV videos")
     p.add_argument("--dry-run", action="store_true", help="Preview only, no moves")
-    p.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
     p.add_argument("--scrape", action="store_true", help="Run scrapers after ingest")
     p.add_argument("--enrich", action="store_true", help="Write NFOs after ingest")
     args = p.parse_args()
@@ -272,8 +325,7 @@ def main():
            config.get("db_path", "fc2_data.db"),
            dry_run=args.dry_run,
            scrape=args.scrape,
-           enrich=args.enrich,
-           confirm=args.yes)
+           enrich=args.enrich)
 
 
 if __name__ == "__main__":
