@@ -292,12 +292,14 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
 
     # Write audit report
     report_lines = [_ingest_report(source, fc2_target, jav_target, normal, skips, unknowns)]
+    from datetime import date
+    today = date.today().isoformat()
     if report_dir:
         os.makedirs(report_dir, exist_ok=True)
-        report_path = os.path.join(report_dir, "ingest-report.md")
+        report_path = os.path.join(report_dir, f"ingest-{today}.md")
     else:
-        report_path = os.path.join(source, "_ingest-report.md")
-    with open(report_path, "w", encoding="utf-8") as f:
+        report_path = os.path.join(source, f"_ingest-{today}.md")
+    with open(report_path, "a", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
     print(f"Report: {report_path}")
 

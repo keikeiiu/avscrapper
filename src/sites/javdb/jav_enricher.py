@@ -140,9 +140,11 @@ def enrich_jav(targets, db_path, cids=None, dry_run=False, report_dir=None):
     conn.close()
 
     report_lines.append(f"\n**Summary:** {updated} updated, {skipped} skipped, {no_dir} no directory")
-    report_path = os.path.join(report_dir, "jav-enrichment-report.md")
+    from datetime import date
+today = date.today().isoformat()
+    report_path = os.path.join(report_dir, f"enrichment-jav-{today}.md")
     os.makedirs(report_dir, exist_ok=True)
-    with open(report_path, "w", encoding="utf-8") as f:
+    with open(report_path, "a", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
     print(f"\nDone: {updated} updated, {skipped} skipped, {no_dir} no directory")
     print(f"Report: {report_path}")
