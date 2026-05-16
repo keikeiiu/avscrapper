@@ -4,112 +4,81 @@
 
 ```
 avscrappertools/
-├── config.yaml              # shared: db_path, report_dir, ingest targets, site sections
-├── reports/                 # dated log-style reports
-├── src/
-│   ├── db.py                # SQLite: fc2/jav tables, find_directories(), CRUD
-│   ├── ingest.py            # auto-detect type, organize files, seed DB
-│   └── sites/
-│       ├── base_scraper.py  # shared scraper framework (CLI, rate-limit, DB writes)
-│       ├── fc2ppvdb/
-│       │   ├── fc2ppvdb_scraper.py   # Playwright → fc2ppvdb.com
-│       │   ├── fc2_nfo.py            # FC2 Kodi NFO builder
-│       │   └── fc2_enricher.py       # writes NFOs next to video files
-│       └── javdb/
-│           ├── javdb_scraper.py      # Playwright → javdb.com
-│           ├── jav_nfo.py            # JAV Kodi NFO builder
-│           └── jav_enricher.py       # writes NFOs next to video files
-└── README.md / .fc2ppv / .javdb
+├── avscraper.py              # entry point (ingest/scrape/enrich/audit/reorganize)
+├── config.example.yaml       # template config (relative paths, no cookies)
+├── docker-compose.yml        # Docker Compose deployment
+├── Dockerfile                # Docker image build
+├── requirements.txt          # pyyaml, playwright
+├── reports/                  # dated log reports
+└── src/
+    ├── db.py                 # SQLite (4 tables), find_directories(), CRUD
+    ├── ingest.py             # auto-detect FC2/JAV, organize, seed DB
+    ├── reorganize.py         # metadata-driven folder hierarchy
+    ├── duration_audit.py     # ffprobe duration check, tiered flags
+    └── sites/
+        ├── base_scraper.py   # shared scraper framework (CLI, rate-limit)
+        ├── fc2ppvdb/
+        │   ├── fc2ppvdb_scraper.py
+        │   ├── fc2_nfo.py
+        │   └── fc2_enricher.py
+        └── javdb/
+            ├── javdb_scraper.py
+            ├── jav_nfo.py
+            └── jav_enricher.py
 ```
 
 ## Status
 
 | Component | Status |
 |-----------|--------|
-| FC2 scraper + NFO + enricher | ✅ working |
-| JavDB scraper + NFO + enricher | ✅ working |
-| Ingest tool (auto-detect FC2/JAV) | ✅ working |
-| Dated report logs | ✅ working |
-| Shared `find_directories` | ✅ working |
-| Duration audit | ⬜ deferred (no MP4 access) |
-| Chinese AV / Madou scraper | ⬜ planned |
-| Uncensored JAV support | ⬜ planned |
-| Folder reorganizer | ⬜ planned |
+| FC2 scraper + NFO + enricher | ✅ |
+| JavDB scraper + NFO + enricher | ✅ |
+| Ingest (auto-detect FC2/JAV/Chinese) | ✅ |
+| Reorganizer (customizable templates) | ✅ |
+| Duration audit (ffprobe, two-tier flagging) | ✅ |
+| Docker image + Compose + GitHub Actions CI | ✅ |
+| Security (XML escaping, parse guards, Bandit/pip-audit CI) | ✅ |
+| Chinese AV auto-detection (`region` column) | ✅ |
+| JavDB login wall vs 404 distinction | ✅ |
+| `{title:N}`, `{series:N}`, `{code}` template vars | ✅ |
+| Studio/series maps (40+ JAV, 18 Chinese) | ✅ |
 
----
+## Database
 
-# Folder Reorganizer — Metadata-Driven Hierarchy
-
-## Context
-
-Flat `FC2-PPV-{id}/` structure works for tools but not for browsing. Reorganizer reads scraped metadata from DB and moves folders into a customizable hierarchy.
-
-## Config
-
-```yaml
-reorganize:
-  target: "C:/Users/keiwa/Downloads/reorganized_"
-  fc2_template: "{seller}/{premiered:4}/FC2-PPV-{cid}"
-  jav_template: "{studio}/{series}/{cid}"
-```
-
-## Template Variables
-
-| Variable | Source | Example |
-|----------|--------|---------|
-| `{cid}` | DB cid | 409694, ABP-948 |
-| `{title}` | DB title | 密着ドキュメント |
-| `{seller}` | FC2 seller | 六本木円光神話 |
-| `{studio}` | JAV studio | S1 NO.1 STYLE |
-| `{series}` | JAV series | ※台本一切無し！！ |
-| `{label}` | JAV label | S1 NO.1 STYLE |
-| `{director}` | JAV director | 嵐山みちる |
-| `{premiered}` | release_date | 2021-07-19 |
-| `{premiered:N}` | first N chars | `{premiered:4}` → 2021 |
-| `{actress}` | first actress | 架乃ゆら |
-| `{rating}` | rating | 4.16 |
-| `{year}` | year | 2021 |
-
-## Safety: Copy-Verify-Delete
-
-Each file is processed atomically: copy → verify size → delete source. If interrupted, both copies exist. Re-run skips already-moved entries. Report documents every move.
-
-## CLI
-
-```bash
-python reorganize.py --dry-run     # preview
-python reorganize.py               # execute (copy-verify-delete)
-python reorganize.py --ids ABP-948 # specific entries
-```
-
-## New File
-
-| File | Purpose |
-|------|---------|
-| `src/reorganize.py` | CLI: read DB, expand template, copy-verify-delete |
+4 tables: `fc2_entries`, `fc2_files`, `jav_entries`, `jav_files`. `jav_entries` has `region` column (jav/chinese). Both entries tables have `audit_status` + `last_audited`.
 
 ## Workflow
 
 ```
-Downloads → ingest.py → organize + seed DB
+downloads/ → ingest.py → processed/
                               ↓
-               scraper.py → fetch metadata → DB
+               scraper.py → av_data.db
                               ↓
-               enricher.py → write .nfo files
+               enricher.py → .nfo files
+                              ↓
+               reorganize.py → reorganized/{FC2,JAV}/{structure}/
+                              ↓
+               duration_audit.py → report + audit tags
 ```
 
-## Detection Strategy (for new sites)
+## CLI (via avscraper.py)
 
-Current: `FC2-PPV-\d+` → FC2, `[A-Z]+-\d+` → JAV.
-Future: prefix blacklist splits Madou from JAV. `--type` flag for explicit control.
+```bash
+python avscraper.py setup
+python avscraper.py ingest --dry-run
+python avscraper.py scrape fc2ppvdb --delay "5-20"
+python avscraper.py scrape javdb --delay "5-20"
+python avscraper.py enrich fc2ppvdb
+python avscraper.py enrich javdb
+python avscraper.py reorganize --dry-run
+python avscraper.py audit --dry-run
+```
 
-## Future: Madou (Chinese AV)
+## Future
 
-Same ID pattern as JAV (`MD-0123`, `MADOU-456`). Need prefix-based detection:
-- `sites/madou/` with scraper + nfo + enricher
-- Config: `ingest.madou_target`
-- Known prefixes: MD, MADOU, MMZ, MSD, MDX, MDSR, MDWP, etc.
-
-## Future: Uncensored JAV
-
-Could use separate scrapers (Caribbean, 1Pondo, Heyzo) or JavDB's existing uncensored flag. NFO already supports `<uncensored>` tag.
+| Item | Notes |
+|------|-------|
+| Uncensored JAV scraper | 123011-900 pattern. Caribbean/1Pondo/Heyzo |
+| JavBus fallback | When JavDB returns 404 |
+| F-drive batch scrape | 617 FC2 IDs pending |
+| Madou dedicated scraper | Low priority — JavDB covers CUS/NHAV |
