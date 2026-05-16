@@ -5,6 +5,7 @@ Produces Kodi-compliant NFOs with <uniqueid>, <sorttitle>, <originaltitle>,
 """
 
 from xml.etree import ElementTree as ET
+from xml.sax.saxutils import escape as _xml_escape
 
 
 # Fields written as simple <key>value</key> in order
@@ -59,20 +60,20 @@ def build_nfo(fields, tags=None, art=None):
         if value is None:
             value = ""
         if key == "uniqueid" and value:
-            lines.append(f'  <uniqueid type="fc2" default="true">{value}</uniqueid>')
+            lines.append(f'  <uniqueid type="fc2" default="true">{_xml_escape(str(value))}</uniqueid>')
         else:
-            lines.append(f"  <{key}>{value}</{key}>")
+            lines.append(f"  <{key}>{_xml_escape(str(value))}</{key}>")
 
     if art and any(art.values()):
         lines.append("  <art>")
         for sub_key in ("poster", "fanart"):
             if art.get(sub_key):
-                lines.append(f"    <{sub_key}>{art[sub_key]}</{sub_key}>")
+                lines.append(f"    <{sub_key}>{_xml_escape(str(art[sub_key]))}</{sub_key}>")
         lines.append("  </art>")
 
     if tags:
         for tag in tags:
-            lines.append(f"  <tag>{tag}</tag>")
+            lines.append(f"  <tag>{_xml_escape(str(tag))}</tag>")
 
     lines.append("</movie>")
     return "\n".join(lines)

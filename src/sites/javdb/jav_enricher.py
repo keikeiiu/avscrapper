@@ -65,7 +65,10 @@ def enrich_jav(targets, db_path, cids=None, dry_run=False, report_dir=None):
         existing_actors = []
         existing_art = {}
         if os.path.exists(nfo_path):
-            existing_fields, existing_genres, existing_tags, existing_actors, existing_art = parse_nfo(nfo_path)
+            try:
+                existing_fields, existing_genres, existing_tags, existing_actors, existing_art = parse_nfo(nfo_path)
+            except Exception:
+                pass  # corrupt NFO — treat as empty
 
         raw_title = entry.get("title") or ""
         scraped = {

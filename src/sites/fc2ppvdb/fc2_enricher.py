@@ -75,7 +75,10 @@ def enrich(targets, db_path, cids=None, dry_run=False, report_dir=None):
             if fname.endswith(".nfo"):
                 fpath = os.path.join(dir_path, fname)
                 if os.path.exists(fpath):
-                    existing_fields, existing_tags, existing_art = parse_nfo(fpath)
+                    try:
+                        existing_fields, existing_tags, existing_art = parse_nfo(fpath)
+                    except Exception:
+                        pass  # corrupt NFO — treat as empty
                 break
 
         raw_title = entry.get("title") or ""

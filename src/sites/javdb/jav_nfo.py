@@ -5,6 +5,7 @@ Richer than FC2: nested <actor> elements, <label>, <series>, <director>,
 """
 
 from xml.etree import ElementTree as ET
+from xml.sax.saxutils import escape as _xml_escape
 
 
 FLAT_FIELDS = [
@@ -76,29 +77,29 @@ def build_nfo(fields, genres=None, tags=None, actors=None, art=None):
         if value is None:
             value = ""
         if key == "uniqueid" and value:
-            lines.append(f'  <uniqueid type="jav" default="true">{value}</uniqueid>')
+            lines.append(f'  <uniqueid type="jav" default="true">{_xml_escape(str(value))}</uniqueid>')
         else:
-            lines.append(f"  <{key}>{value}</{key}>")
+            lines.append(f"  <{key}>{_xml_escape(str(value))}</{key}>")
 
     if art and any(art.values()):
         lines.append("  <art>")
         for sub_key in ("poster", "fanart"):
             if art.get(sub_key):
-                lines.append(f"    <{sub_key}>{art[sub_key]}</{sub_key}>")
+                lines.append(f"    <{sub_key}>{_xml_escape(str(art[sub_key]))}</{sub_key}>")
         lines.append("  </art>")
 
     if genres:
         for g in genres:
-            lines.append(f"  <genre>{g}</genre>")
+            lines.append(f"  <genre>{_xml_escape(str(g))}</genre>")
     if tags:
         for t in tags:
-            lines.append(f"  <tag>{t}</tag>")
+            lines.append(f"  <tag>{_xml_escape(str(t))}</tag>")
     if actors:
         for a in actors:
             lines.append("  <actor>")
-            lines.append(f"    <name>{a.get('name', '')}</name>")
+            lines.append(f"    <name>{_xml_escape(str(a.get('name', '')))}</name>")
             if a.get("thumb"):
-                lines.append(f"    <thumb>{a['thumb']}</thumb>")
+                lines.append(f"    <thumb>{_xml_escape(str(a['thumb']))}</thumb>")
             lines.append("  </actor>")
 
     lines.append("</movie>")
