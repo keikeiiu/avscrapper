@@ -4,57 +4,58 @@ import threading
 import uuid
 import json
 import os
+import sys
 import queue
 
 
 ACTIONS = {
     "ingest": {
-        "cmd": ["python", "avscraper.py", "ingest"],
+        "cmd": [sys.executable, "avscraper.py", "ingest"],
         "params": ["source", "yes", "dry_run"],
         "flags": {"yes": "--yes", "dry_run": "--dry-run"},
         "kw": {"source": "--source"},
     },
     "scrape_fc2": {
-        "cmd": ["python", "avscraper.py", "scrape", "fc2ppvdb"],
+        "cmd": [sys.executable, "avscraper.py", "scrape", "fc2ppvdb"],
         "params": ["ids", "delay", "flagged", "retry_errors"],
         "flags": {"flagged": "--flagged", "retry_errors": "--retry-errors"},
         "kw": {"ids": "--ids", "delay": "--delay"},
     },
     "scrape_jav": {
-        "cmd": ["python", "avscraper.py", "scrape", "javdb"],
+        "cmd": [sys.executable, "avscraper.py", "scrape", "javdb"],
         "params": ["ids", "delay", "flagged", "retry_errors"],
         "flags": {"flagged": "--flagged", "retry_errors": "--retry-errors"},
         "kw": {"ids": "--ids", "delay": "--delay"},
     },
     "enrich_fc2": {
-        "cmd": ["python", "avscraper.py", "enrich", "fc2ppvdb"],
+        "cmd": [sys.executable, "avscraper.py", "enrich", "fc2ppvdb"],
         "params": ["ids", "dry_run"],
         "flags": {"dry_run": "--dry-run"},
         "kw": {"ids": "--ids"},
     },
     "enrich_jav": {
-        "cmd": ["python", "avscraper.py", "enrich", "javdb"],
+        "cmd": [sys.executable, "avscraper.py", "enrich", "javdb"],
         "params": ["ids", "dry_run"],
         "flags": {"dry_run": "--dry-run"},
         "kw": {"ids": "--ids"},
     },
     "reorganize": {
-        "cmd": ["python", "avscraper.py", "reorganize"],
+        "cmd": [sys.executable, "avscraper.py", "reorganize"],
         "params": ["ids", "dry_run"],
         "flags": {"dry_run": "--dry-run"},
         "kw": {"ids": "--ids"},
     },
     "audit": {
-        "cmd": ["python", "avscraper.py", "audit"],
+        "cmd": [sys.executable, "avscraper.py", "audit"],
         "params": [],
     },
     "flag_fc2": {
-        "cmd": ["python", "avscraper.py", "flag", "fc2ppvdb"],
+        "cmd": [sys.executable, "avscraper.py", "flag", "fc2ppvdb"],
         "params": ["ids"],
         "kw": {"ids": "--ids"},
     },
     "flag_jav": {
-        "cmd": ["python", "avscraper.py", "flag", "javdb"],
+        "cmd": [sys.executable, "avscraper.py", "flag", "javdb"],
         "params": ["ids"],
         "kw": {"ids": "--ids"},
     },
@@ -114,6 +115,7 @@ def run_action(action_name, params):
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
             env["PYTHONIOENCODING"] = "utf-8"
+            from web.app import ROOT
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -122,7 +124,7 @@ def run_action(action_name, params):
                 encoding="utf-8",
                 errors="replace",
                 env=env,
-                cwd="/app" if os.path.exists("/app") else None,
+                cwd=ROOT,
             )
             _sessions[sid]["process"] = proc
             for line in proc.stdout:
