@@ -48,7 +48,7 @@ services:
     image: keikeiiu/avscraper:latest
     container_name: avscraper
     ports:
-      - "3721:5000"
+      - "3721:3721"
     volumes:
       - ./appdata:/app/appdata         # config, DB, reports (required)
       - ./downloads:/app/downloads     # video source
@@ -109,10 +109,20 @@ python -m playwright install chromium
 | [README.cli.md](README.cli.md) | CLI reference — all commands, flags, templates |
 | [README.fc2ppv.md](README.fc2ppv.md) | FC2 scraper — implementation, config, cookies |
 | [README.javdb.md](README.javdb.md) | JavDB scraper — implementation, config, cookies |
-| [README.webgui.md](README.webgui.md) | Web GUI — dashboard, actions, database, config editor |
+| [README.webgui.md](README.webgui.md) | Web GUI — dashboard, pipeline, actions, database, config editor |
 | [PLAN.md](PLAN.md) | Architecture overview, status, future roadmap |
 
 ## Pipeline
+
+Run all steps sequentially with one click — open `/pipeline` in the web GUI or use the CLI:
+
+```bash
+# Web GUI — one-click run-all with live flow visualization
+open http://localhost:3721/pipeline
+
+# Docker CLI — all steps sequentially
+docker compose run avscraper python avscraper.py pipeline
+```
 
 | Step | Command | What it does |
 |------|---------|--------------|

@@ -163,6 +163,19 @@ Thresholds (configurable in `config.yaml` → `duration_audit`):
 
 Results are written to the database (`audit_status` column) and a dated report.
 
+### pipeline
+
+Runs all steps sequentially in one command: ingest → scrape_fc2 → scrape_jav → enrich_fc2 → enrich_jav → reorganize. Stops on first error.
+
+```bash
+python avscraper.py pipeline
+python avscraper.py pipeline --dry-run          # preview all steps
+python avscraper.py pipeline --skip-scrape      # ingest → enrich → reorganize only
+python avscraper.py pipeline --skip-enrich      # ingest → scrape → reorganize only
+```
+
+Also available in the web GUI at `/pipeline` with a live flow visualization.
+
 ## DB Stats
 
 ```bash
