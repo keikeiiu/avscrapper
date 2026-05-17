@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="cards" id="stats-cards">
+  <div class="card"><div class="label">FC2 Scraped</div><div class="value green">-</div></div>
+  <div class="card"><div class="label">JAV Scraped</div><div class="value green">-</div></div>
+  <div class="card">
+    <div class="label">Pending</div>
+    <div class="value yellow" id="pending-value">-</div>
+    <div id="pending-detail" class="card-detail"></div>
+  </div>
+  <div class="card"><div class="label">Errors / Flagged</div><div class="value red">-</div></div>
+</div>
+
+<h3>Quick Actions</h3>
+<div class="btn-group" id="quick-btns">
+  <button class="btn" data-action="ingest" data-params='{"source":"downloads/","yes":true}' onclick="runQuickBtn(this)">&#9654; Ingest</button>
+  <button class="btn" data-action="scrape_fc2" data-params='{"delay":"5-20"}' onclick="runQuickBtn(this)">&#9654; Scrape FC2</button>
+  <button class="btn" data-action="scrape_jav" data-params='{"delay":"5-20"}' onclick="runQuickBtn(this)">&#9654; Scrape JAV</button>
+  <button class="btn" data-action="enrich_fc2" data-params='{}' onclick="runQuickBtn(this)">&#9654; Enrich FC2</button>
+  <button class="btn" data-action="enrich_jav" data-params='{}' onclick="runQuickBtn(this)">&#9654; Enrich JAV</button>
+  <button class="btn" data-action="reorganize" data-params='{"dry_run":true}' onclick="runQuickBtn(this)">&#9654; Reorganize (dry-run)</button>
+</div>
+
+<div id="quick-status" style="margin-bottom: 12px;"></div>
+
+<h3>Live Output <span id="quick-spinner" style="display:none"><span class="spinner"></span>running...</span></h3>
+<div class="log-panel" id="quick-log">
+  <span class="dim">Output appears here when an action is running.</span>
+</div>
+
+{% if history %}
+<h3 style="margin-top: 24px;">Recent Activity</h3>
+<div class="history-list">
+  {% for h in history %}
+  <div class="history-item">
+    <span class="badge {{ 'green' if h.code == 0 else 'red' }}">{{ h.action }}</span>
+    <span class="dim">{{ h.duration }}s ago</span>
+    <span class="dim">— exit {{ h.code }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

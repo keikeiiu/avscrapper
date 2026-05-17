@@ -11,10 +11,10 @@ from sites.base_scraper import BaseScraper
 
 
 class JavdbScraper(BaseScraper):
-    def scrape_pending(self, db_path, cids=None, retry_errors=False, dry_run=False):
+    def scrape_pending(self, db_path, cids=None, retry_errors=False, flagged=False, dry_run=False):
         """Override to use JAV-specific DB functions."""
         from db import (connect, init_db, insert_pending_jav, upsert_scraped_jav,
-                         mark_status_jav, get_pending_jav, get_errors_jav)
+                         mark_status_jav, get_pending_jav, get_errors_jav, get_flagged_jav)
 
         init_db(db_path)
         conn = connect(db_path)
@@ -23,13 +23,15 @@ class JavdbScraper(BaseScraper):
             entries = [{"cid": c, "full_number": c} for c in cids]
             for e in entries:
                 insert_pending_jav(conn, e["cid"], e["full_number"], self.source)
+        elif flagged:
+            entries = get_flagged_jav(conn, source=self.source)
         elif retry_errors:
             entries = get_errors_jav(conn, source=self.source)
         else:
             entries = get_pending_jav(conn, source=self.source)
 
         if not entries:
-            print(f"No pending entries for source '{self.source}'. Nothing to scrape.")
+            print(f"No entries for source '{self.source}'. Nothing to scrape.")
             conn.close()
             return
 
@@ -40,6 +42,7 @@ class JavdbScraper(BaseScraper):
             print("[DRY RUN -- no DB writes]")
 
         scraped = 0
+        nfo_imported = 0
         not_found = 0
         errors = 0
 
@@ -47,6 +50,28 @@ class JavdbScraper(BaseScraper):
             for i, entry in enumerate(entries):
                 cid = entry["cid"]
                 print(f"[{i+1}/{total}] {cid} ... ", end="", flush=True)
+
+                # Check for existing NFO before hitting the web
+                nfo_data = self._try_nfo_import(cid)
+                if nfo_data:
+                    # Auto-detect region
+                    studio = (nfo_data.get("studio") or "").lower()
+                    chinese = {"麻豆傳媒映畫", "麻豆传媒映画", "大象传媒", "madou", "麻豆",
+                               "精东影业", "天美传媒", "星空无限传媒", "蜜桃影像", "糖心",
+                               "皇家华人", "果冻传媒", "扣扣传媒", "爱豆传媒", "兔子先生",
+                               "swag", "91制片厂", "NHAV", "EDEA"}
+                    nfo_data["region"] = "chinese" if any(c in studio for c in chinese) else "jav"
+                    if dry_run:
+                        status = (nfo_data.get("title") or "OK")[:60]
+                        print(f"DRY-RUN NFO: {status}")
+                        nfo_imported += 1
+                        continue
+                    upsert_scraped_jav(conn, cid, nfo_data, self.source)
+                    status = (nfo_data.get("title") or "OK")[:60]
+                    print(f"NFO: {status}")
+                    nfo_imported += 1
+                    self._rate_limit()
+                    continue
 
                 if dry_run:
                     print("SKIP (dry-run)")
@@ -91,7 +116,7 @@ class JavdbScraper(BaseScraper):
             conn.close()
             self.teardown()
 
-        print(f"\nDone: {scraped} scraped, {not_found} not found, {errors} errors")
+        print(f"\nDone: {scraped} scraped, {nfo_imported} from NFO, {not_found} not found, {errors} errors")
 
     def setup(self):
         from playwright.sync_api import sync_playwright

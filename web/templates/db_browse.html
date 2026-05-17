@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Database</h2>
+
+<div class="tabs" id="table-tabs">
+  <button class="tab-btn active" onclick="selectTable('fc2_entries')">FC2 Entries</button>
+  <button class="tab-btn" onclick="selectTable('jav_entries')">JAV Entries</button>
+  <button class="tab-btn" onclick="selectTable('fc2_files')">FC2 Files</button>
+  <button class="tab-btn" onclick="selectTable('jav_files')">JAV Files</button>
+</div>
+
+<div class="filter-bar">
+  <select id="db-status-filter" onchange="resetAndLoad()">
+    <option value="">All statuses</option>
+    <option value="pending">Pending</option>
+    <option value="scraped">Scraped</option>
+    <option value="error">Error</option>
+    <option value="404">404</option>
+    <option value="flagged">Flagged</option>
+  </select>
+  <select id="db-source-filter" onchange="resetAndLoad()">
+    <option value="">All sources</option>
+    <option value="fc2ppvdb">fc2ppvdb</option>
+    <option value="javdb">javdb</option>
+  </select>
+  <input type="text" id="db-search" placeholder="Search CID or title..." oninput="resetAndLoad()">
+  <select id="db-per-page" onchange="resetAndLoad()">
+    <option value="25">25/page</option>
+    <option value="50" selected>50/page</option>
+    <option value="100">100/page</option>
+    <option value="200">200/page</option>
+  </select>
+  <button class="btn sm" id="col-toggle-btn" onclick="toggleColumnMenu()" style="margin-left:auto">Columns</button>
+  <button class="btn sm danger" id="bulk-flag-btn" style="display:none" onclick="bulkFlag()">Flag Selected</button>
+</div>
+
+<div id="col-menu" class="col-menu" style="display:none"></div>
+
+<div id="db-table" style="overflow-x: auto;">
+  <span class="dim">Select a table to browse.</span>
+</div>
+
+<div id="db-pagination" style="display:none; margin-top: 12px;" class="pagination"></div>
+{% endblock %}

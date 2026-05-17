@@ -8,6 +8,8 @@ Usage:
     python avscraper.py enrich javdb
     python avscraper.py reorganize --dry-run
     python avscraper.py reorganize --report
+    python avscraper.py flag fc2ppvdb --ids 123456,789012
+    python avscraper.py flag javdb --ids SSIS-123
 """
 
 import sys
@@ -34,7 +36,7 @@ def _find_config():
 def _resolve_paths(config_path):
     """Resolve relative paths in config against config directory."""
     import yaml
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
     base = os.path.dirname(config_path)
 
@@ -108,11 +110,65 @@ def main():
         _run_script("reorganize.py", *extra)
     elif command == "audit":
         _run_script("duration_audit.py", *extra)
+    elif command == "flag":
+        if not extra:
+            print("Usage: python avscraper.py flag <site> --ids <cids>")
+            print("  site: fc2ppvdb or javdb")
+            return
+        site = extra[0]
+        flag_args = extra[1:]
+        if not flag_args:
+            print("Usage: python avscraper.py flag <site> --ids <cids>")
+            return
+        _flag_entries(config_path, site, flag_args)
     elif command == "setup":
         _setup(config, config_path)
     else:
         print(f"Unknown command: {command}")
         print(__doc__)
+
+
+def _flag_entries(config_path, site, flag_args):
+    """Mark entries as flagged for re-scrape."""
+    import argparse
+    import yaml
+
+    p = argparse.ArgumentParser(description=f"Flag {site} entries for re-scrape")
+    p.add_argument("--ids", required=True, help="Comma-separated CIDs to flag")
+    args = p.parse_args(flag_args)
+
+    cids = [c.strip() for c in args.ids.split(",") if c.strip()]
+    if not cids:
+        print("No CIDs provided.")
+        return
+
+    config_dir = os.path.dirname(config_path)
+    with open(config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    raw_db = config.get("db_path", "av_data.db")
+    if not os.path.isabs(raw_db):
+        raw_db = os.path.normpath(os.path.join(config_dir, raw_db))
+
+    from src.db import connect, mark_flagged, mark_flagged_jav
+
+    conn = connect(raw_db)
+    if site == "fc2ppvdb":
+        mark = mark_flagged
+    elif site == "javdb":
+        mark = mark_flagged_jav
+    else:
+        print(f"Unknown site: {site}")
+        conn.close()
+        return
+
+    for cid in cids:
+        mark(conn, cid)
+        print(f"  {cid} → flagged")
+
+    conn.close()
+    print(f"\n{len(cids)} entries flagged. Run:")
+    print(f"  python avscraper.py scrape {site} --flagged")
 
 
 def _setup(config, config_path):

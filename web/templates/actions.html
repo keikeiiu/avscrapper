@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Actions</h2>
+
+<div class="form-row">
+  <label>Action</label>
+  <select id="action-select" onchange="updateForm()">
+    <option value="">-- Select --</option>
+    <option value="ingest">Ingest</option>
+    <option value="scrape_fc2">Scrape FC2</option>
+    <option value="scrape_jav">Scrape JAV</option>
+    <option value="enrich_fc2">Enrich FC2</option>
+    <option value="enrich_jav">Enrich JAV</option>
+    <option value="reorganize">Reorganize</option>
+    <option value="audit">Audit</option>
+    <option value="flag_fc2">Flag FC2</option>
+    <option value="flag_jav">Flag JAV</option>
+  </select>
+</div>
+
+<div id="action-params" style="margin-bottom: 16px;"></div>
+
+<div style="margin-bottom: 16px;">
+  <button class="btn primary" id="run-btn" onclick="runAction()" disabled>&#9654; Run</button>
+  <button class="btn danger sm" id="stop-btn" onclick="stopAction()" style="display:none">&#9632; Stop</button>
+</div>
+
+<div id="action-status"></div>
+
+<h3>Output <span id="action-spinner" style="display:none"><span class="spinner"></span>running...</span></h3>
+<div class="log-panel" id="action-log">
+  <span class="dim">Select an action and click Run.</span>
+</div>
+{% endblock %}

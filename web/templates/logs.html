@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Logs</h2>
+
+<h3>Report Files</h3>
+{% if reports %}
+<ul class="report-list">
+  {% for r in reports %}
+  <li onclick="viewReport('{{ r.name }}')">
+    <span>{{ r.name }}</span>
+    <span class="size">{{ (r.size / 1024) | round(1) }} KB</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="dim">No report files found.</p>
+{% endif %}
+
+<h3 style="margin-top: 24px;">Report Content</h3>
+<div id="report-content" class="rendered-md" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;min-height:200px;">
+  <span class="dim">Click a report file above to view it rendered.</span>
+</div>
+
+<h3 style="margin-top: 24px;">Live Session</h3>
+<div class="log-panel" id="live-log" style="height: 300px;">
+  <span class="dim">Live output from running actions appears here.</span>
+</div>
+{% endblock %}

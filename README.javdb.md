@@ -27,6 +27,12 @@ python scrapers/javdb_scraper.py --ids SSIS-119,CAWD-122 --delay "5-20"
 python scrapers/javdb_scraper.py
 python scrapers/javdb_scraper.py --retry-errors
 
+# Re-scrape flagged entries
+python scrapers/javdb_scraper.py --flagged
+
+# Flag entries for re-scrape (via main entry point)
+python avscraper.py flag javdb --ids SSIS-119,CAWD-122
+
 # Write NFOs
 python jav_enricher.py
 python jav_enricher.py --ids SSIS-119
@@ -39,6 +45,10 @@ python jav_enricher.py --dry-run
 |------|----------|
 | `--delay 5` | Fixed 5s |
 | `--delay "5-20"` | Random 5–20s (human-like) |
+
+## NFO-First Import
+
+If a `.nfo` file (`{cid}.nfo`) already exists in the video's folder, the scraper imports metadata from it directly instead of making a web request. This avoids unnecessary scraping for videos that already have metadata.
 
 ## Scraped Fields (29)
 

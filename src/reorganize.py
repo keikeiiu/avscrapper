@@ -123,7 +123,7 @@ def _find_source_dirs(targets, id_extractor):
 
 def reorganize(config_path, dry_run=False, cids=None):
     """Main reorganize loop."""
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     # Resolve paths
@@ -317,7 +317,7 @@ def main():
     if not os.path.exists(config_path):
         config_path = os.path.join(base_dir, "fc2_config.yaml")
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     target_base = config.get("reorganize", {}).get("target")

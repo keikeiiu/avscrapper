@@ -1,14 +1,16 @@
-# AV Scraper — one-command setup
-# docker compose up              → build + run ingest
-# docker compose run scraper scrape javdb --delay "5-20"
-# docker compose run scraper enrich javdb
-# docker compose run scraper reorganize --dry-run
+# AV Scraper — Web GUI + CLI
+# docker compose up              → start web GUI on http://localhost:5000
+# docker compose run avscraper python avscraper.py ...  → CLI mode
+#
+# CLI actions are also available from the web GUI at /actions
 
 services:
-  scraper:
+  avscraper:
     image: keikeiiu/avscraper:latest
-    build: .  # fallback: builds locally if image not available
+    build: .
     container_name: avscraper
+    ports:
+      - "5000:5000"
     volumes:
       - ./downloads:/app/downloads
       - ./processed:/app/processed
@@ -19,7 +21,6 @@ services:
       - AV_CONFIG=/app/config.yaml
     stdin_open: true
     tty: true
-    entrypoint: ["python", "/app/avscraper.py"]
 
 volumes:
   av_data:

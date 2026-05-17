@@ -178,6 +178,12 @@ def mark_status(conn, cid, status, error_message=None):
     conn.commit()
 
 
+def mark_flagged(conn, cid):
+    """Mark an FC2 entry as flagged for re-scrape."""
+    conn.execute("UPDATE fc2_entries SET status='flagged', error_message=NULL WHERE cid=?", (cid,))
+    conn.commit()
+
+
 def get_pending(conn, source=None):
     """Return all rows with status='pending', optionally filtered by source."""
     if source:
@@ -205,14 +211,27 @@ def get_scraped(conn, source=None):
 
 
 def get_errors(conn, source=None):
-    """Return all rows with status='error' or '404'."""
+    """Return all rows with status='error', '404', or 'flagged'."""
     if source:
         rows = conn.execute(
-            "SELECT * FROM fc2_entries WHERE status IN ('error','404') AND source=? ORDER BY cid", (source,)
+            "SELECT * FROM fc2_entries WHERE status IN ('error','404','flagged') AND source=? ORDER BY cid", (source,)
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM fc2_entries WHERE status IN ('error','404') ORDER BY cid"
+            "SELECT * FROM fc2_entries WHERE status IN ('error','404','flagged') ORDER BY cid"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_flagged(conn, source=None):
+    """Return all rows with status='flagged'."""
+    if source:
+        rows = conn.execute(
+            "SELECT * FROM fc2_entries WHERE status='flagged' AND source=? ORDER BY cid", (source,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM fc2_entries WHERE status='flagged' ORDER BY cid"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -339,6 +358,12 @@ def mark_status_jav(conn, cid, status, error_message=None):
     conn.commit()
 
 
+def mark_flagged_jav(conn, cid):
+    """Mark a JAV entry as flagged for re-scrape."""
+    conn.execute("UPDATE jav_entries SET status='flagged', error_message=NULL WHERE cid=?", (cid,))
+    conn.commit()
+
+
 def get_pending_jav(conn, source=None):
     """Return pending JAV entries."""
     if source:
@@ -366,13 +391,26 @@ def get_scraped_jav(conn, source=None):
 
 
 def get_errors_jav(conn, source=None):
-    """Return JAV entries with error/404 status."""
+    """Return JAV entries with error/404/flagged status."""
     if source:
         rows = conn.execute(
-            "SELECT * FROM jav_entries WHERE status IN ('error','404') AND source=? ORDER BY cid", (source,)
+            "SELECT * FROM jav_entries WHERE status IN ('error','404','flagged') AND source=? ORDER BY cid", (source,)
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM jav_entries WHERE status IN ('error','404') ORDER BY cid"
+            "SELECT * FROM jav_entries WHERE status IN ('error','404','flagged') ORDER BY cid"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_flagged_jav(conn, source=None):
+    """Return JAV entries with flagged status."""
+    if source:
+        rows = conn.execute(
+            "SELECT * FROM jav_entries WHERE status='flagged' AND source=? ORDER BY cid", (source,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM jav_entries WHERE status='flagged' ORDER BY cid"
         ).fetchall()
     return [dict(r) for r in rows]

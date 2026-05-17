@@ -26,6 +26,20 @@ def _delay_str(delay):
     return f"{delay}s"
 
 
+def _fc2_extractor(folder_name):
+    if folder_name.startswith("FC2-PPV-"):
+        import re
+        m = re.match(r'FC2-PPV-(\d{6,8})', folder_name)
+        return m.group(1) if m else None
+    return None
+
+
+def _jav_extractor(folder_name):
+    import re
+    m = re.match(r'^([A-Z]+[_-]?\d{2,5})', folder_name, re.IGNORECASE)
+    return m.group(1).upper().replace("_", "-") if m else None
+
+
 class BaseScraper(ABC):
     def __init__(self, site_config):
         self.base_url = site_config["base_url"].rstrip("/")
@@ -36,6 +50,7 @@ class BaseScraper(ABC):
         self.cookies = site_config.get("cookies", {})
         self.source = site_config.get("source", "unknown")
         self._consecutive_429 = 0
+        self._nfo_dirs = None  # lazily populated for NFO-first check
         self.setup()
 
     def setup(self):
@@ -58,9 +73,74 @@ class BaseScraper(ABC):
         """Fetch and parse metadata for a CID. Returns dict or None on 404."""
         ...
 
-    def scrape_pending(self, db_path, cids=None, retry_errors=False, dry_run=False):
+    def _try_nfo_import(self, cid):
+        """Check for existing NFO in the CID's directory. Return DB-ready dict or None."""
+        try:
+            from db import VIDEO_EXTS
+
+            # Determine NFO filename: FC2 uses FC2-PPV-{cid}.nfo, JAV uses {cid}.nfo
+            is_fc2 = cid.isdigit() and len(cid) >= 6
+            nfo_name = f"FC2-PPV-{cid}.nfo" if is_fc2 else f"{cid}.nfo"
+            id_extractor = _fc2_extractor if is_fc2 else _jav_extractor
+
+            # Lazy-load directories from config ingest targets
+            if self._nfo_dirs is None:
+                self._nfo_dirs = {}
+                config_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                config_path = os.path.join(config_dir, "config.yaml")
+                if not os.path.exists(config_path):
+                    config_path = os.path.join(config_dir, "fc2_config.yaml")
+                if os.path.exists(config_path):
+                    import yaml
+                    with open(config_path, encoding="utf-8") as f:
+                        config = yaml.safe_load(f)
+                    ing = config.get("ingest", {})
+                    targets = []
+                    if is_fc2 and ing.get("fc2_target"):
+                        targets = [ing["fc2_target"]]
+                    elif ing.get("jav_target"):
+                        targets = [ing["jav_target"]]
+                    for target in targets:
+                        if not os.path.isabs(target):
+                            target = os.path.normpath(os.path.join(config_dir, target))
+                        if os.path.isdir(target):
+                            for root, dirs, _files in os.walk(target):
+                                for name in dirs:
+                                    ecid = id_extractor(name)
+                                    if ecid:
+                                        full = os.path.join(root, name)
+                                        has_video = any(
+                                            os.path.splitext(f)[1].lower() in VIDEO_EXTS
+                                            for f in os.listdir(full)
+                                            if os.path.isfile(os.path.join(full, f))
+                                        )
+                                        if ecid not in self._nfo_dirs or has_video:
+                                            self._nfo_dirs[ecid] = full
+
+            dir_path = self._nfo_dirs.get(cid)
+            if not dir_path:
+                return None
+
+            nfo_path = os.path.join(dir_path, nfo_name)
+            if not os.path.exists(nfo_path):
+                return None
+
+            if is_fc2:
+                from sites.fc2ppvdb.fc2_nfo import parse_nfo, nfo_to_db_data
+            else:
+                from sites.javdb.jav_nfo import parse_nfo, nfo_to_db_data
+
+            parsed = parse_nfo(nfo_path)
+            data = nfo_to_db_data(parsed)
+            if data.get("title"):
+                return data
+        except Exception:
+            pass
+        return None
+
+    def scrape_pending(self, db_path, cids=None, retry_errors=False, flagged=False, dry_run=False):
         """Main loop: scrape pending (or specified) CIDs and write to DB."""
-        from db import connect, init_db, insert_pending, upsert_scraped, mark_status, get_pending, get_errors
+        from db import connect, init_db, insert_pending, upsert_scraped, mark_status, get_pending, get_errors, get_flagged
 
         init_db(db_path)
         conn = connect(db_path)
@@ -69,13 +149,15 @@ class BaseScraper(ABC):
             entries = [{"cid": c, "full_number": f"FC2-PPV-{c}"} for c in cids]
             for e in entries:
                 insert_pending(conn, e["cid"], e["full_number"], self.source)
+        elif flagged:
+            entries = get_flagged(conn, source=self.source)
         elif retry_errors:
             entries = get_errors(conn, source=self.source)
         else:
             entries = get_pending(conn, source=self.source)
 
         if not entries:
-            print(f"No pending entries for source '{self.source}'. Nothing to scrape.")
+            print(f"No entries for source '{self.source}'. Nothing to scrape.")
             conn.close()
             return
 
@@ -85,6 +167,7 @@ class BaseScraper(ABC):
             print("[DRY RUN -- no DB writes]")
 
         scraped = 0
+        nfo_imported = 0
         not_found = 0
         errors = 0
 
@@ -92,6 +175,21 @@ class BaseScraper(ABC):
             for i, entry in enumerate(entries):
                 cid = entry["cid"]
                 print(f"[{i+1}/{total}] {cid} ... ", end="", flush=True)
+
+                # Check for existing NFO before hitting the web
+                nfo_data = self._try_nfo_import(cid)
+                if nfo_data:
+                    if dry_run:
+                        status = (nfo_data.get("title") or "OK")[:60]
+                        print(f"DRY-RUN NFO: {status}")
+                        nfo_imported += 1
+                        continue
+                    upsert_scraped(conn, cid, nfo_data, self.source)
+                    status = (nfo_data.get("title") or "OK")[:60]
+                    print(f"NFO: {status}")
+                    nfo_imported += 1
+                    self._rate_limit()
+                    continue
 
                 if dry_run:
                     print("SKIP (dry-run)")
@@ -121,14 +219,15 @@ class BaseScraper(ABC):
             conn.close()
             self.teardown()
 
-        print(f"\nDone: {scraped} scraped, {not_found} not found, {errors} errors")
+        print(f"\nDone: {scraped} scraped, {nfo_imported} from NFO, {not_found} not found, {errors} errors")
 
     @classmethod
     def build_argparser(cls):
         p = argparse.ArgumentParser(description=f"{cls.__name__} scraper")
         p.add_argument("--ids", help="Comma-separated CIDs to scrape")
         p.add_argument("--ids-file", help="File with one CID per line (or markdown list)")
-        p.add_argument("--retry-errors", action="store_true", help="Retry entries with status=error or 404")
+        p.add_argument("--retry-errors", action="store_true", help="Retry entries with status=error, 404, or flagged")
+        p.add_argument("--flagged", action="store_true", help="Scrape only entries marked as flagged for re-scrape")
         p.add_argument("--delay", type=str, help="Scrape delay in seconds or range 'min-max' (e.g. '5-20')")
         p.add_argument("--dry-run", action="store_true", help="Show what would be scraped without DB writes")
         p.add_argument("--seed-only", action="store_true", help="Insert CIDs as pending, then exit (no scraping)")
@@ -171,7 +270,7 @@ class BaseScraper(ABC):
             config_path = os.path.join(config_parent, "fc2_config.yaml")
         config_path = os.environ.get("AV_CONFIG", config_path)
         config_path = os.path.normpath(config_path)
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         # Resolve relative db_path against config directory
@@ -212,5 +311,6 @@ class BaseScraper(ABC):
             db_path=config.get("db_path", "av_data.db"),
             cids=cids,
             retry_errors=args.retry_errors,
+            flagged=args.flagged,
             dry_run=args.dry_run,
         )

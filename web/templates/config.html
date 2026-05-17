@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Config Editor</h2>
+
+<div class="btn-group" style="margin-bottom: 12px;">
+  <button class="btn primary" id="config-load-btn" onclick="loadConfig()">Load Config</button>
+  <button class="btn" id="config-save-btn" onclick="saveConfig()" disabled>Save</button>
+</div>
+
+<div id="config-status"></div>
+
+<textarea id="codemirror-editor"></textarea>
+
+<p class="dim" style="margin-top:8px;">
+  Cookies are stored in <code>sites.&lt;name&gt;.cookies</code> sections.
+  YAML syntax is validated before saving. A backup (<code>config.yaml.bak</code>) is created on each save.
+  Changes take effect after restarting the container.
+</p>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='codemirror/codemirror.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='codemirror/theme/monokai.css') }}">
+<script src="{{ url_for('static', filename='codemirror/codemirror.min.js') }}"></script>
+<script src="{{ url_for('static', filename='codemirror/mode/yaml/yaml.min.js') }}"></script>
+<style>
+  .CodeMirror { height: 70vh; border: 1px solid var(--border); border-radius: var(--radius); }
+</style>
+<script>
+var cmEditor = CodeMirror.fromTextArea(document.getElementById('codemirror-editor'), {
+  lineNumbers: true,
+  mode: 'yaml',
+  theme: 'monokai',
+  tabSize: 2,
+  indentUnit: 2,
+  indentWithTabs: false,
+  viewportMargin: Infinity,
+  styleActiveLine: true,
+  matchBrackets: true,
+  autoCloseBrackets: true,
+});
+
+async function loadConfig() {
+  const resp = await fetch('/api/config');
+  const data = await resp.json();
+  if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
+  cmEditor.setValue(data.content);
+  cmEditor.clearHistory();
+  document.getElementById('config-save-btn').disabled = false;
+  document.getElementById('config-status').innerHTML = '<span class="badge green">Loaded: ' + data.path + '</span>';
+  showToast('Config loaded', 'success');
+}
+
+async function saveConfig() {
+  const content = cmEditor.getValue();
+  const resp = await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: content }),
+  });
+  const data = await resp.json();
+  if (data.error) {
+    document.getElementById('config-status').innerHTML = '<span class="badge red">' + data.error + '</span>';
+    showToast('Save failed: ' + data.error, 'error');
+  } else {
+    document.getElementById('config-status').innerHTML = '<span class="badge green">Saved (backup: ' + data.backup + ')</span>';
+    showToast('Config saved', 'success');
+  }
+}
+</script>
+{% endblock %}

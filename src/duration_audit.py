@@ -113,7 +113,7 @@ def _jav_extractor(name):
 
 def audit(config_path, dry_run=False, cids=None, vtype=None):
     """Run duration audit for FC2 and/or JAV entries."""
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     raw_db = config.get("db_path", "av_data.db")

@@ -79,6 +79,23 @@ def build_nfo(fields, tags=None, art=None):
     return "\n".join(lines)
 
 
+def nfo_to_db_data(parsed):
+    """Convert parsed NFO data back to DB-ready dict for upsert_scraped()."""
+    fields, tags, art = parsed
+    data = {}
+    data["full_number"] = fields.get("uniqueid", "")
+    data["title"] = fields.get("title", "")
+    data["outline"] = fields.get("plot", "")
+    data["seller"] = fields.get("studio", "")
+    data["release_date"] = fields.get("premiered", "")
+    data["duration"] = fields.get("runtime", "")
+    data["url"] = fields.get("website", "")
+    data["tags"] = tags if tags else []
+    data["cover_url"] = art.get("poster", "")
+    data["mosaic"] = ""
+    return data
+
+
 def merge_fields(existing, scraped):
     """Merge scraped data into existing NFO fields.
 

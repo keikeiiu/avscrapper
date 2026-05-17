@@ -82,3 +82,4 @@ python avscraper.py audit --dry-run
 | JavBus fallback | When JavDB returns 404 |
 | F-drive batch scrape | 617 FC2 IDs pending |
 | Madou dedicated scraper | Low priority — JavDB covers CUS/NHAV |
+| Obscura browser backend | Evaluate when more mature (v0.1.2 as of 2026-05). CDP-compatible drop-in for Chromium, ~30MB memory, built-in anti-fingerprinting. Would replace Playwright's bundled Chromium via `connect_over_cdp`. Risk: early-stage, may not support all Playwright APIs used by scrapers. |

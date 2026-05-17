@@ -342,7 +342,7 @@ def main():
     config_path = os.path.join(base_dir, "config.yaml")
     if not os.path.exists(config_path):
         config_path = os.path.join(base_dir, "fc2_config.yaml")
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     # Resolve relative db_path

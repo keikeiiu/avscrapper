@@ -106,6 +106,31 @@ def build_nfo(fields, genres=None, tags=None, actors=None, art=None):
     return "\n".join(lines)
 
 
+def nfo_to_db_data(parsed):
+    """Convert parsed NFO data back to DB-ready dict for upsert_scraped_jav()."""
+    fields, genres, tags, actors, art = parsed
+    data = {}
+    data["full_number"] = fields.get("uniqueid", "")
+    data["title"] = fields.get("title", "")
+    data["plot"] = fields.get("plot", "")
+    data["studio"] = fields.get("studio", "")
+    data["label"] = fields.get("label", "")
+    data["series"] = fields.get("series", "")
+    data["director"] = fields.get("director", "")
+    data["release_date"] = fields.get("premiered", "")
+    data["year"] = fields.get("year", "")
+    data["runtime"] = fields.get("runtime", "")
+    data["rating"] = float(fields["rating"]) if fields.get("rating") else None
+    data["votes"] = int(fields["votes"]) if fields.get("votes") else None
+    data["url"] = fields.get("website", "")
+    data["genres"] = genres if genres else []
+    data["tags"] = tags if tags else []
+    data["actors"] = actors if actors else []
+    data["cover_url"] = art.get("poster", "")
+    data["fanart_urls"] = [art["fanart"]] if art.get("fanart") else []
+    return data
+
+
 def merge_fields(existing, scraped):
     """Merge scraped data into existing NFO fields.
 

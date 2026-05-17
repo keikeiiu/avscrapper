@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AV Scraper</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <span class="logo">AV Scraper</span>
+    <nav>
+      <a href="{{ url_for('index') }}" {% if request.path == '/' %}class="active"{% endif %}>Dashboard</a>
+      <a href="{{ url_for('actions_page') }}" {% if request.path == '/actions' %}class="active"{% endif %}>Actions</a>
+      <a href="{{ url_for('db_page') }}" {% if request.path == '/db' %}class="active"{% endif %}>Database<span id="nav-pending-badge" style="display:none" class="nav-badge"></span></a>
+      <a href="{{ url_for('logs_page') }}" {% if request.path == '/logs' %}class="active"{% endif %}>Logs</a>
+      <a href="{{ url_for('config_page') }}" {% if request.path == '/config' %}class="active"{% endif %}>Config</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <div id="toast-container"></div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

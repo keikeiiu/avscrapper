@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-RUN pip install --no-cache-dir pyyaml playwright && \
+RUN pip install --no-cache-dir pyyaml playwright flask gunicorn && \
     playwright install --with-deps chromium && \
     playwright install-deps chromium
 
@@ -9,5 +9,6 @@ COPY . .
 
 ENV AV_CONFIG=/app/config.yaml
 
-ENTRYPOINT ["python", "avscraper.py"]
-CMD ["--help"]
+# Web GUI (default)
+EXPOSE 5000
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "0", "web.app:app"]
