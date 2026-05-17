@@ -124,11 +124,20 @@ def audit(config_path, dry_run=False, cids=None, vtype=None):
     minor_thresh = aud_cfg.get("minor_threshold", 30)
     hard_thresh = aud_cfg.get("hard_threshold", 60)
 
+    config_dir = os.path.dirname(config_path)
     ing = config.get("ingest", {})
     reorg = config.get("reorganize", {})
-    fc2_targets = [ing.get("fc2_target")] if ing.get("fc2_target") else []
-    jav_targets = [ing.get("jav_target")] if ing.get("jav_target") else []
+    fc2_base = ing.get("fc2_target")
+    jav_base = ing.get("jav_target")
     reorg_target = reorg.get("target")
+    if fc2_base and not os.path.isabs(fc2_base):
+        fc2_base = os.path.normpath(os.path.join(config_dir, fc2_base))
+    if jav_base and not os.path.isabs(jav_base):
+        jav_base = os.path.normpath(os.path.join(config_dir, jav_base))
+    if reorg_target and not os.path.isabs(reorg_target):
+        reorg_target = os.path.normpath(os.path.join(config_dir, reorg_target))
+    fc2_targets = [fc2_base] if fc2_base else []
+    jav_targets = [jav_base] if jav_base else []
     if reorg_target:
         fc2_targets.append(reorg_target)
         jav_targets.append(reorg_target)
@@ -270,9 +279,14 @@ def main():
     args = p.parse_args()
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config_path = os.path.join(base_dir, "config.yaml")
-    if not os.path.exists(config_path):
-        config_path = os.path.join(base_dir, "config.example.yaml")
+    config_path = os.environ.get("AV_CONFIG")
+    if config_path:
+        config_path = os.path.normpath(config_path)
+    else:
+        config_path = os.path.join(base_dir, "config.yaml")
+        if not os.path.exists(config_path):
+            print("No config.yaml found. Run: python avscraper.py setup")
+            sys.exit(1)
 
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
     audit(config_path, dry_run=args.dry_run, cids=cids, vtype=args.vtype)

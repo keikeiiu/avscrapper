@@ -1,8 +1,8 @@
 # AV Scraper — Example Configuration
 # Copy to config.yaml and fill in your paths + cookies.
 
-db_path: "av_data.db"
-report_dir: "reports"
+db_path: "./appdata/av_data.db"
+report_dir: "./appdata/reports"
 
 # Ingest — where downloads arrive and where organized files go
 ingest:

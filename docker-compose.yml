@@ -13,16 +13,12 @@ services:
     ports:
       - "3721:5000"
     volumes:
-      - ./downloads:/app/downloads
-      - ./processed:/app/processed
-      - ./reorganized:/app/reorganized
-      - ./config.yaml:/app/config.yaml:ro
-      - av_data:/app
+      - ./appdata:/app/appdata         # config, DB, reports
+      - ./downloads:/app/downloads     # video source
+      - ./processed:/app/processed     # ingest staging
+      - ./reorganized:/app/reorganized # final destination
     environment:
-      - AV_CONFIG=/app/config.yaml
+      - AV_CONFIG=/app/appdata/config.yaml
     restart: unless-stopped
     stdin_open: true
     tty: true
-
-volumes:
-  av_data:

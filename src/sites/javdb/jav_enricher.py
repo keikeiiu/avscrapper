@@ -160,28 +160,37 @@ def main():
     args = p.parse_args()
 
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    config_path = os.path.join(base_dir, "config.yaml")
-    if not os.path.exists(config_path):
-        config_path = os.path.join(base_dir, "fc2_config.yaml")
+    config_path = os.environ.get("AV_CONFIG")
+    if config_path:
+        config_path = os.path.normpath(config_path)
+    else:
+        config_path = os.path.join(base_dir, "config.yaml")
+        if not os.path.exists(config_path):
+            print("No config.yaml found. Run: python avscraper.py setup")
+            sys.exit(1)
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
+    config_dir = os.path.dirname(config_path)
 
     raw_db = config.get("db_path", "av_data.db")
     if not os.path.isabs(raw_db):
-        raw_db = os.path.normpath(os.path.join(os.path.dirname(config_path), raw_db))
+        raw_db = os.path.normpath(os.path.join(config_dir, raw_db))
     config["db_path"] = raw_db
 
     ing = config.get("ingest", {})
-    targets = [ing.get("jav_target")] if ing.get("jav_target") else []
+    jav_target = ing.get("jav_target")
+    targets = [jav_target] if jav_target else []
     if not targets:
         targets = config.get("scan_directories", [])
     if not targets:
         print("No targets configured. Set ingest.jav_target in config.yaml.")
         sys.exit(1)
+    # Resolve relative target paths against config directory
+    targets = [os.path.normpath(os.path.join(config_dir, t)) if not os.path.isabs(t) else t for t in targets]
 
     report_dir = config.get("report_dir")
     if report_dir and not os.path.isabs(report_dir):
-        report_dir = os.path.normpath(os.path.join(os.path.dirname(config_path), report_dir))
+        report_dir = os.path.normpath(os.path.join(config_dir, report_dir))
 
     cids = [c.strip() for c in args.ids.split(",")] if args.ids else None
 

@@ -87,9 +87,12 @@ class BaseScraper(ABC):
             if self._nfo_dirs is None:
                 self._nfo_dirs = {}
                 config_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                config_path = os.path.join(config_dir, "config.yaml")
-                if not os.path.exists(config_path):
-                    config_path = os.path.join(config_dir, "fc2_config.yaml")
+                config_path = os.environ.get("AV_CONFIG")
+                if config_path:
+                    config_path = os.path.normpath(config_path)
+                    config_dir = os.path.dirname(config_path)
+                else:
+                    config_path = os.path.join(config_dir, "config.yaml")
                 if os.path.exists(config_path):
                     import yaml
                     with open(config_path, encoding="utf-8") as f:
@@ -265,10 +268,10 @@ class BaseScraper(ABC):
         args = parser.parse_args(argv)
 
         config_parent = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(config_parent, "config.yaml")
+        config_path = os.environ.get("AV_CONFIG") or os.path.join(config_parent, "config.yaml")
         if not os.path.exists(config_path):
-            config_path = os.path.join(config_parent, "fc2_config.yaml")
-        config_path = os.environ.get("AV_CONFIG", config_path)
+            print("No config.yaml found. Run: python avscraper.py setup")
+            sys.exit(1)
         config_path = os.path.normpath(config_path)
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)

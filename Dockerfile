@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir pyyaml playwright flask gunicorn markdown \
 WORKDIR /app
 COPY . .
 
-ENV AV_CONFIG=/app/config.yaml
+ENV AV_CONFIG=/app/appdata/config.yaml
 
 EXPOSE 5000
 CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "0", "web.app:app"]

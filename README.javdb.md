@@ -1,83 +1,79 @@
-# JavDB Scraper + JAV NFO Enricher
+# JavDB Scraper
 
-Scrapes metadata from [javdb.com](https://javdb.com) → SQLite → Kodi NFO files.
-
-## Quick Start
-
-```bash
-pip install -r requirements.txt
-playwright install chromium
-```
+Scrapes metadata from [javdb.com](https://javdb.com) using Playwright → SQLite → Kodi NFO files.
 
 ## How It Works
 
-1. Navigate to `https://javdb.com/search?q={ID}&f=all`
-2. Find the matching result by `<strong>` ID tag
-3. Navigate to the detail page (e.g., `/v/0YqAa`)
-4. Parse metadata from `<nav>` labels: 番號, 日期, 時長, 導演, 片商, 系列, 評分, 類別, 演員
-5. Extract cover from `jdbstatic.com/covers`, fanart from `jdbstatic.com/samples`
+1. **Search**: navigates to `https://javdb.com/search?q={ID}&f=all`
+2. **Match**: finds the result where the `<strong>` ID tag matches the query CID
+3. **Detail page**: navigates to the matched video page (e.g., `/v/0YqAa`)
+4. **Parse**: extracts metadata from `<nav>` label-value pairs (番號, 日期, 時長, 導演, 片商, 系列, 評分, 類別, 演員)
+5. **NFO-first check**: if `{cid}.nfo` already exists in the video folder, metadata is imported from the NFO directly — no web request
+6. **Write to DB**: upserts into `jav_entries` table
+7. **Rate limit**: random delay between requests, exponential backoff on 429
 
-## Usage
+## Config Required
 
-```bash
-# Specific IDs
-python scrapers/javdb_scraper.py --ids SSIS-119,CAWD-122 --delay "5-20"
+Add to `config.yaml` under `sites.javdb`:
 
-# Resume / retry
-python scrapers/javdb_scraper.py
-python scrapers/javdb_scraper.py --retry-errors
-
-# Re-scrape flagged entries
-python scrapers/javdb_scraper.py --flagged
-
-# Flag entries for re-scrape (via main entry point)
-python avscraper.py flag javdb --ids SSIS-119,CAWD-122
-
-# Write NFOs
-python jav_enricher.py
-python jav_enricher.py --ids SSIS-119
-python jav_enricher.py --dry-run
+```yaml
+sites:
+  javdb:
+    base_url: "https://javdb.com"
+    scrape_delay_seconds: "5-20"    # random delay range (recommended)
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
+    cookies:
+      over18: "1"           # required — bypass age gate
+      _jdb_session: ""      # optional — needed for VIP/restricted content
 ```
 
-## Delay Control
+### Auth Levels
 
-| Flag | Behavior |
-|------|----------|
-| `--delay 5` | Fixed 5s |
-| `--delay "5-20"` | Random 5–20s (human-like) |
+- **Public**: `over18: "1"` cookie only — access to non-VIP content
+- **Logged in**: `_jdb_session` cookie — needed for VIP/restricted videos
+- **Without cookies**: age gate blocks access, scraper fails
 
-## NFO-First Import
+### Getting Cookies
 
-If a `.nfo` file (`{cid}.nfo`) already exists in the video's folder, the scraper imports metadata from it directly instead of making a web request. This avoids unnecessary scraping for videos that already have metadata.
+1. Open https://javdb.com in Chrome/Firefox
+2. F12 → Application (或 Storage) → Cookies → javdb.com
+3. Copy `over18` (value is usually `1`) and `_jdb_session`
+4. Update `config.yaml`
 
-## Scraped Fields (29)
+## Scraped Fields
 
-| Field | Source | Example |
-|-------|--------|---------|
-| `title` | `<title>` tag | SSIS-119 ※台本一切無し！！... |
-| `studio` | 片商 | S1 NO.1 STYLE |
-| `label` | 標籤/發行 | S1 NO.1 STYLE (defaults to studio) |
-| `series` | 系列 | ※台本一切無し！！... |
-| `director` | 導演 | 嵐山みちる |
-| `release_date` | 日期 | 2021-07-19 |
-| `year` | derived | 2021 |
-| `runtime` | 時長 | 150 分鍾 |
-| `rating` | 評分 | 4.16 |
-| `votes` | 評分 | 236 |
-| `genres` | 類別 | [美少女電影, 單體作品, ...] |
-| `actors` | 演員 | [{name: 架乃ゆら}, ...] |
-| `cover_url` | img | jdbstatic.com/covers/... |
-| `fanart_urls` | samples | 10x jdbstatic.com/samples/... |
+| Field | Source Label | Example |
+|-------|-------------|---------|
+| `cid` | 番號 | `SSIS-119` |
+| `title` | `<title>` tag | `SSIS-119 ※台本一切無し！！...` |
+| `studio` | 片商 | `S1 NO.1 STYLE` |
+| `label` | 標籤/發行 | `S1 NO.1 STYLE` (defaults to studio if missing) |
+| `series` | 系列 | `※台本一切無し！！...` |
+| `director` | 導演 | `嵐山みちる` |
+| `release_date` | 日期 | `2021-07-19` |
+| `year` | Derived from date | `2021` |
+| `runtime` | 時長 | `150 分鍾` |
+| `runtime_seconds` | Calculated | (runtime in minutes × 60) |
+| `rating` | 評分 | `4.16` |
+| `votes` | 評分 count | `236` |
+| `genres` | 類別 | `[美少女電影, 單體作品, ...]` |
+| `actors` | 演員 | `[{name: "架乃ゆら"}, ...]` |
+| `cover_url` | Cover image | `jdbstatic.com/covers/...` |
+| `fanart_urls` | Samples | 10× `jdbstatic.com/samples/...` |
+| `url` | Page URL | `https://javdb.com/v/0YqAa` |
 
 ## NFO Format
 
+Written as `{cid}.nfo` (e.g., `SSIS-119.nfo`) alongside the video files:
+
 ```xml
+<?xml version="1.0" encoding="UTF-8"?>
 <movie>
   <title>SSIS-119 Japanese Title</title>
   <originaltitle>Japanese Title</originaltitle>
   <sorttitle>SSIS-119</sorttitle>
   <uniqueid type="jav" default="true">SSIS-119</uniqueid>
-  <plot>Description</plot>
+  <plot>Description text</plot>
   <studio>S1 NO.1 STYLE</studio>
   <label>S1 NO.1 STYLE</label>
   <series>Series Name</series>
@@ -89,10 +85,10 @@ If a `.nfo` file (`{cid}.nfo`) already exists in the video's folder, the scraper
   <genre>單體作品</genre>
   <actor>
     <name>架乃ゆら</name>
-    <thumb></thumb>
   </actor>
   <rating>4.16</rating>
   <votes>236</votes>
+  <website>https://javdb.com/v/0YqAa</website>
   <art>
     <poster>https://c0.jdbstatic.com/covers/...</poster>
     <fanart>https://c0.jdbstatic.com/samples/...</fanart>
@@ -100,16 +96,25 @@ If a `.nfo` file (`{cid}.nfo`) already exists in the video's folder, the scraper
 </movie>
 ```
 
-## Auth
+## Merge Behavior
 
-- **Public**: `over18: 1` cookie (bypass age gate)
-- **Logged in**: `_jdb_session` (session cookie) — needed for VIP content
+When enriching, if an NFO already exists:
+- **Poster/fanart**: never overwritten
+- **Title**: scraped value fills empty, doesn't overwrite existing
+- **Genres/tags/actors**: additive merge (deduplicated by name)
+- **All other fields**: scraped fills empty, never overwrites non-empty
 
-Cookies go in `config.yaml` → `sites.javdb.cookies`.
+## Studio/Series Maps
 
-## Cookie Refresh
+JavDB uses inconsistent or Japanese names for studios and series. The `studio_map` and `series_map` in `config.yaml` normalize these — e.g., `SODクリエイト` → `SOD Create`. See `config.example.yaml` for the full map of 40+ studios.
 
-1. Log into https://javdb.com in Chrome
-2. F12 → Application → Cookies → javdb.com
-3. Copy: `_jdb_session`, `cf_clearance`, `over18`, `locale`
-4. Update `config.yaml`
+## CLI
+
+See [README.cli.md](README.cli.md) for full command reference. JavDB-specific examples:
+
+```bash
+python avscraper.py scrape javdb --ids SSIS-119,CAWD-122 --delay "5-20"
+python avscraper.py scrape javdb --flagged
+python avscraper.py enrich javdb --dry-run
+python avscraper.py flag javdb --ids SSIS-119
+```

@@ -23,7 +23,10 @@ sys.path.insert(0, SRC)
 
 
 def _find_config():
-    """Return path to config.yaml, preferring local over example."""
+    """Return path to config.yaml, preferring env var, then local, then example."""
+    env = os.environ.get("AV_CONFIG")
+    if env and os.path.exists(env):
+        return env
     local = os.path.join(HERE, "config.yaml")
     if os.path.exists(local):
         return local

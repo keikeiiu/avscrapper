@@ -5,6 +5,7 @@ import os
 
 def connect(db_path):
     """Return a connection with WAL mode enabled."""
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")

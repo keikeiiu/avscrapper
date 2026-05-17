@@ -339,16 +339,22 @@ def main():
     args = p.parse_args()
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config_path = os.path.join(base_dir, "config.yaml")
-    if not os.path.exists(config_path):
-        config_path = os.path.join(base_dir, "fc2_config.yaml")
+    config_path = os.environ.get("AV_CONFIG")
+    if config_path:
+        config_path = os.path.normpath(config_path)
+    else:
+        config_path = os.path.join(base_dir, "config.yaml")
+        if not os.path.exists(config_path):
+            print("No config.yaml found. Run: python avscraper.py setup")
+            sys.exit(1)
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
+    config_dir = os.path.dirname(config_path)
 
     # Resolve relative db_path
     raw_db = config.get("db_path", "av_data.db")
     if not os.path.isabs(raw_db):
-        raw_db = os.path.normpath(os.path.join(os.path.dirname(config_path), raw_db))
+        raw_db = os.path.normpath(os.path.join(config_dir, raw_db))
     config["db_path"] = raw_db
 
     ing = config.get("ingest", {})
@@ -363,12 +369,20 @@ def main():
         print("No target specified. Use --fc2-target / --jav-target or set in config.yaml")
         sys.exit(1)
 
+    # Resolve relative paths against config directory
+    if source and not os.path.isabs(source):
+        source = os.path.normpath(os.path.join(config_dir, source))
+    if fc2_target and not os.path.isabs(fc2_target):
+        fc2_target = os.path.normpath(os.path.join(config_dir, fc2_target))
+    if jav_target and not os.path.isabs(jav_target):
+        jav_target = os.path.normpath(os.path.join(config_dir, jav_target))
+
     fc2_target = fc2_target or os.path.join(source, "_fc2")
     jav_target = jav_target or os.path.join(source, "_jav")
 
     report_dir = config.get("report_dir")
     if report_dir and not os.path.isabs(report_dir):
-        report_dir = os.path.normpath(os.path.join(os.path.dirname(config_path), report_dir))
+        report_dir = os.path.normpath(os.path.join(config_dir, report_dir))
 
     ingest(source, fc2_target, jav_target,
            config.get("db_path", "av_data.db"),

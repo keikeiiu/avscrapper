@@ -3,11 +3,32 @@ import os
 import sys
 import json
 import time
+import shutil
 from collections import deque
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
+
+# Resolve config.yaml path (respects AV_CONFIG for Docker)
+_config_default = os.path.join(ROOT, "config.yaml")
+config_yaml = os.environ.get("AV_CONFIG", _config_default)
+# Ensure config.yaml exists on first run
+if not os.path.isfile(config_yaml):
+    example = os.path.join(ROOT, "config.example.yaml")
+    if os.path.exists(example):
+        os.makedirs(os.path.dirname(config_yaml), exist_ok=True)
+        shutil.copy(example, config_yaml)
+        # Docker: rewrite app-data paths to absolute (relative breaks when config is in subdirectory)
+        if config_yaml.startswith("/app/"):
+            import yaml as _yaml
+            with open(config_yaml, encoding="utf-8") as f:
+                cfg = _yaml.safe_load(f)
+            cfg["db_path"] = "/app/appdata/av_data.db"
+            cfg["report_dir"] = "/app/appdata/reports"
+            with open(config_yaml, "w", encoding="utf-8") as f:
+                _yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
+            os.makedirs("/app/appdata/reports", exist_ok=True)
 
 from flask import Flask, render_template, jsonify
 import yaml
@@ -19,10 +40,9 @@ action_history = deque(maxlen=10)
 
 
 def load_config():
-    config_path = os.path.join(ROOT, "config.yaml")
+    config_path = os.environ.get("AV_CONFIG") or os.path.join(ROOT, "config.yaml")
     if not os.path.exists(config_path):
         config_path = os.path.join(ROOT, "config.example.yaml")
-    config_path = os.environ.get("AV_CONFIG", config_path)
 
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)

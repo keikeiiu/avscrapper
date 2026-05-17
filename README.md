@@ -1,38 +1,100 @@
-# AV Scraper & NFO Enricher
+# AV Scraper Tools
 
-Scrapes metadata → SQLite → Kodi-compliant NFO files.
+Auto-detect, scrape, enrich, and organize adult video files. Drop videos into a folder, run the pipeline, get Kodi-compliant NFO metadata and a clean folder hierarchy.
 
-## Quick Start (Docker)
+```
+downloads/  →  ingest  →  processed/  →  scrape  →  enrich  →  reorganized/
+                   (detect type,        (metadata     (NFO        (folder hierarchy
+                    sort into folders)   to SQLite)    files)      from templates)
+```
 
-See [README.docker.md](README.docker.md) for full guide.
+## Quick Start (Docker Compose)
 
 ```bash
-cp config.example.yaml config.yaml   # then edit
-docker compose run avscraper ingest --dry-run
+# 1. Create docker-compose.yml (see below) and start
+docker compose up -d
+
+# 2. Open http://localhost:3721 — configure paths + cookies in the Config page
+
+# 3. Drop videos into ./downloads, then use the Actions page or CLI
+docker compose run avscraper python avscraper.py ingest --dry-run
 ```
 
 ## Quick Start (Local)
 
 ```bash
-# 1. Create config
-cp config.example.yaml config.yaml
-
-# 2. Install
+# 1. Install
 pip install -r requirements.txt
 playwright install chromium
 
-# 3. Drop downloaded videos into ./downloads/
-# 4. Run the pipeline
+# 2. Create config
+cp config.example.yaml config.yaml   # edit paths + cookies
+
+# 3. Run the pipeline
 python avscraper.py ingest --source ./downloads
-python avscraper.py scrape fc2ppvdb
-python avscraper.py scrape javdb
+python avscraper.py scrape fc2ppvdb --delay "5-20"
+python avscraper.py scrape javdb --delay "5-20"
 python avscraper.py enrich fc2ppvdb
 python avscraper.py enrich javdb
 python avscraper.py reorganize --dry-run
 python avscraper.py reorganize
 ```
 
-## Install
+## Docker Compose
+
+```yaml
+services:
+  avscraper:
+    image: keikeiiu/avscraper:latest
+    container_name: avscraper
+    ports:
+      - "3721:5000"
+    volumes:
+      - ./appdata:/app/appdata         # config, DB, reports (required)
+      - ./downloads:/app/downloads     # video source
+      - ./processed:/app/processed     # ingest staging
+      - ./reorganized:/app/reorganized # final destination
+    environment:
+      - AV_CONFIG=/app/appdata/config.yaml
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+```
+
+- `./appdata` is the only required mount — holds config.yaml, av_data.db, and reports.
+- Video mounts are flexible — mount as many or as few as you need, matching your config paths.
+- On first run, config.yaml is auto-created from the example template.
+- Edit paths and cookies via the Web UI Config page (or directly on the host at `./appdata/config.yaml`).
+
+### CLI mode in Docker
+
+```bash
+docker compose run avscraper python avscraper.py ingest --dry-run
+docker compose run avscraper python avscraper.py scrape fc2ppvdb --delay "5-20"
+docker compose run avscraper python avscraper.py enrich fc2ppvdb
+docker compose run avscraper python avscraper.py reorganize --dry-run
+docker compose run avscraper python avscraper.py audit --dry-run
+```
+
+## Plain Docker (without Compose)
+
+```bash
+docker run --rm \
+  -v ./appdata:/app/appdata \
+  -v ./downloads:/app/downloads \
+  -v ./processed:/app/processed \
+  -v ./reorganized:/app/reorganized \
+  -e AV_CONFIG=/app/appdata/config.yaml \
+  keikeiiu/avscraper python avscraper.py ingest --dry-run
+```
+
+## Install (Local)
+
+### macOS / Linux
+```bash
+pip3 install -r requirements.txt
+playwright install chromium
+```
 
 ### Windows
 ```bash
@@ -40,105 +102,43 @@ python -m pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-### macOS
-```bash
-pip3 install -r requirements.txt
-playwright install chromium
-```
+## Guides
 
-### Docker
-```bash
-docker build -t avscraper .
-docker run -v ./downloads:/app/downloads -v ./processed:/app/processed -v ./config.yaml:/app/config.yaml avscraper ingest --source /app/downloads
-```
+| Guide | Content |
+|-------|---------|
+| [README.cli.md](README.cli.md) | CLI reference — all commands, flags, templates |
+| [README.fc2ppv.md](README.fc2ppv.md) | FC2 scraper — implementation, config, cookies |
+| [README.javdb.md](README.javdb.md) | JavDB scraper — implementation, config, cookies |
+| [README.webgui.md](README.webgui.md) | Web GUI — dashboard, actions, database, config editor |
+| [PLAN.md](PLAN.md) | Architecture overview, status, future roadmap |
 
-## Entry Point
+## Pipeline
 
-```bash
-python avscraper.py ingest [--source ./downloads] [--dry-run]
-python avscraper.py scrape <fc2ppvdb|javdb> [--ids ...] [--flagged] [--retry-errors]
-python avscraper.py enrich <fc2ppvdb|javdb> [--ids ...]
-python avscraper.py flag <fc2ppvdb|javdb> --ids <cids>
-python avscraper.py reorganize [--dry-run] [--report]
-```
-
-### NFO-First Import
-
-During `scrape`, the tool checks if a `.nfo` file already exists in the video's folder. If found, metadata is imported from the NFO directly — no web request is made. This avoids unnecessary scraping for videos that already have metadata.
-
-### Re-Scrape Flagging
-
-Mark entries for re-scraping when metadata appears wrong or incomplete:
-
-```bash
-# Flag specific entries
-python avscraper.py flag fc2ppvdb --ids 123456,789012
-python avscraper.py flag javdb --ids SSIS-123
-
-# Re-scrape flagged entries
-python avscraper.py scrape fc2ppvdb --flagged
-python avscraper.py scrape javdb --flagged --delay "5-20"
-```
-
-`--retry-errors` also picks up flagged entries alongside errors and 404s.
+| Step | Command | What it does |
+|------|---------|--------------|
+| Setup | `python avscraper.py setup` | Copy example config, check Playwright, create directories |
+| Ingest | `python avscraper.py ingest` | Detect FC2/JAV by filename, move into folders, seed DB |
+| Scrape | `python avscraper.py scrape <site>` | Fetch metadata from fc2ppvdb.com or javdb.com → SQLite |
+| Enrich | `python avscraper.py enrich <site>` | Write Kodi-compliant NFO files alongside videos |
+| Flag | `python avscraper.py flag <site> --ids ...` | Mark entries for re-scrape |
+| Reorganize | `python avscraper.py reorganize` | Move folders into metadata-driven hierarchy |
+| Audit | `python avscraper.py audit` | Compare metadata duration vs actual video duration |
 
 ## Sites
 
-| Site | Guide |
-|------|-------|
-| fc2ppvdb.com | [README.fc2ppv.md](README.fc2ppv.md) |
-| javdb.com | [README.javdb.md](README.javdb.md) |
-
-## Reorganizer
-
-Metadata-driven folder hierarchy via configurable templates. See [README.reorganize.md](README.reorganize.md).
-
-```bash
-python avscraper.py reorganize --dry-run
-python avscraper.py reorganize --report
-```
-
-## Config
-
-Copy `config.example.yaml` → `config.yaml` and set your paths + cookies. All paths are relative to the config file. See [README.reorganize.md](README.reorganize.md) for structure templates and studio/series maps.
-
-## DB Stats
-
-```bash
-python -c "from src.db import connect,get_stats; c=connect('av_data.db'); [print(f'{r[\"source\"]:12} {r[\"status\"]:10} {r[\"count\"]}') for r in get_stats(c)]"
-```
-
-## Web GUI
-
-A browser-based interface for managing the full pipeline — trigger actions, watch live logs, browse the database.
-
-```bash
-# Install web dependencies
-pip install flask gunicorn
-
-# Start (development)
-python -m web.app
-
-# Open http://localhost:3721
-```
-
-**Pages:**
-- **Dashboard** — stat cards, quick actions, live output
-- **Actions** — trigger any pipeline step with parameters, stream live output via SSE
-- **Database** — browse FC2/JAV entries with filters, search, sort, expand rows, flag entries
-- **Logs** — view report files and live session output
-
-**Docker:** The Docker image starts the web GUI on port 3721 (mapped from internal 5000). CLI access is still available via `docker compose run avscraper python avscraper.py ...`. See [README.docker.md](README.docker.md).
+| Site | Status | Auth |
+|------|--------|------|
+| [fc2ppvdb.com](https://fc2ppvdb.com) | Production | Session cookies required |
+| [javdb.com](https://javdb.com) | Production | `over18` cookie (public), `_jdb_session` (VIP) |
 
 ## Credits
 
-Built with these open source libraries:
-
 | Library | Purpose | License |
 |---------|---------|---------|
-| [Playwright](https://playwright.dev) | Browser automation for scraping | Apache 2.0 |
+| [Playwright](https://playwright.dev) | Browser automation | Apache 2.0 |
 | [Flask](https://flask.palletsprojects.com) | Web framework | BSD |
 | [CodeMirror 5](https://codemirror.net/5/) | In-browser YAML editor | MIT |
-| [Python-Markdown](https://python-markdown.github.io) | Markdown rendering for reports | BSD |
-| [PyYAML](https://pyyaml.org) | YAML config parsing | MIT |
-| [Gunicorn](https://gunicorn.org) | WSGI server (production) | MIT |
+| [Python-Markdown](https://python-markdown.github.io) | Report rendering | BSD |
+| [PyYAML](https://pyyaml.org) | Config parsing | MIT |
+| [Gunicorn](https://gunicorn.org) | WSGI server | MIT |
+| [defusedxml](https://pypi.org/project/defusedxml/) | Safe XML parsing | PSF |

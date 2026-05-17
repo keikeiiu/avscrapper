@@ -140,9 +140,20 @@ def reorganize(config_path, dry_run=False, cids=None):
         print("No reorganize.target in config.yaml")
         return
 
+    config_dir = os.path.dirname(config_path)
     ing = config.get("ingest", {})
-    fc2_targets = [ing.get("fc2_target")] if ing.get("fc2_target") else []
-    jav_targets = [ing.get("jav_target")] if ing.get("jav_target") else []
+    fc2_targets = []
+    jav_targets = []
+    fc2_base = ing.get("fc2_target")
+    jav_base = ing.get("jav_target")
+    if fc2_base:
+        if not os.path.isabs(fc2_base):
+            fc2_base = os.path.normpath(os.path.join(config_dir, fc2_base))
+        fc2_targets = [fc2_base]
+    if jav_base:
+        if not os.path.isabs(jav_base):
+            jav_base = os.path.normpath(os.path.join(config_dir, jav_base))
+        jav_targets = [jav_base]
 
     conn = connect(raw_db)
 
@@ -314,17 +325,25 @@ def main():
     args = p.parse_args()
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config_path = os.path.join(base_dir, "config.yaml")
-    if not os.path.exists(config_path):
-        config_path = os.path.join(base_dir, "fc2_config.yaml")
+    config_path = os.environ.get("AV_CONFIG")
+    if config_path:
+        config_path = os.path.normpath(config_path)
+    else:
+        config_path = os.path.join(base_dir, "config.yaml")
+        if not os.path.exists(config_path):
+            print("No config.yaml found. Run: python avscraper.py setup")
+            sys.exit(1)
 
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
+    config_dir = os.path.dirname(config_path)
 
     target_base = config.get("reorganize", {}).get("target")
+    if target_base and not os.path.isabs(target_base):
+        target_base = os.path.normpath(os.path.join(config_dir, target_base))
     report_dir = config.get("report_dir", "reports")
     if not os.path.isabs(report_dir):
-        report_dir = os.path.normpath(os.path.join(os.path.dirname(config_path), report_dir))
+        report_dir = os.path.normpath(os.path.join(config_dir, report_dir))
 
     if args.report:
         if not target_base:

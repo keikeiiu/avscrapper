@@ -8,19 +8,20 @@ config_bp = Blueprint("config", __name__)
 
 
 def _config_path():
-    # Use ROOT stored in app config (set in web/app.py)
     root = current_app.config.get("ROOT_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    path = os.path.join(root, "config.yaml")
-    if not os.path.exists(path):
-        path = os.path.join(root, "config.example.yaml")
-    return path
+    return os.environ.get("AV_CONFIG", os.path.join(root, "config.yaml"))
 
 
 @config_bp.route("/api/config", methods=["GET"])
 def get_config():
     path = _config_path()
+    # If config.yaml is missing, copy from example for read-only viewing
     if not os.path.exists(path):
-        return jsonify({"error": "config.yaml not found"}), 404
+        example = os.path.join(os.path.dirname(path), "config.example.yaml")
+        if os.path.exists(example):
+            path = example
+        else:
+            return jsonify({"error": "config.yaml not found"}), 404
     with open(path, encoding="utf-8") as f:
         content = f.read()
     return jsonify({"content": content, "path": os.path.basename(path)})
