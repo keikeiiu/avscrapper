@@ -156,7 +156,7 @@ def reorganize(config_path, dry_run=False, cids=None):
         entries = conn.execute(
             "SELECT * FROM fc2_entries WHERE status='scraped' AND title IS NOT NULL"
         ).fetchall()
-        _process_type("FC2", entries, fc2_dirs, fc2_structure, target_base, conn, dry_run, cids, studio_map, series_map)
+        _process_type("FC2", entries, fc2_dirs, fc2_structure, target_base, conn, dry_run, cids, studio_map, series_map, report_dir)
 
     # ── JAV ──
     jav_structure = reorg.get("jav_structure")
@@ -165,7 +165,7 @@ def reorganize(config_path, dry_run=False, cids=None):
         entries = conn.execute(
             "SELECT * FROM jav_entries WHERE status='scraped' AND title IS NOT NULL"
         ).fetchall()
-        _process_type("JAV", entries, jav_dirs, jav_structure, target_base, conn, dry_run, cids, studio_map, series_map)
+        _process_type("JAV", entries, jav_dirs, jav_structure, target_base, conn, dry_run, cids, studio_map, series_map, report_dir)
 
     conn.close()
 
@@ -189,7 +189,7 @@ def _jav_extractor(name):
 
 
 def _process_type(label, entries, cid_dirs, structure, target_base, conn,
-                  dry_run=False, cids=None, studio_map=None, series_map=None):
+                  dry_run=False, cids=None, studio_map=None, series_map=None, report_dir=None):
     """Process one type (FC2 or JAV)."""
     if studio_map is None: studio_map = {}
     if series_map is None: series_map = {}
@@ -262,12 +262,13 @@ def _process_type(label, entries, cid_dirs, structure, target_base, conn,
 
     from datetime import date
     today = date.today().isoformat()
-    report_path = os.path.join(os.path.dirname(target_base), "reports",
-                               f"reorganize-{label.lower()}-{today}.md")
-    os.makedirs(os.path.dirname(report_path), exist_ok=True)
+    report_base = report_dir if report_dir else os.path.join(os.path.dirname(target_base), "reports")
+    report_path = os.path.join(report_base, f"reorganize-{label.lower()}-{today}.md")
+    os.makedirs(report_base, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report))
     print(f"\nDone: {moved} moved, {skipped} skipped, {no_dir} no dir")
+    print(f"Report: {report_path}")
     print(f"Report: {report_path}")
 
 
