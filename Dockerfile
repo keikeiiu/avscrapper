@@ -17,5 +17,5 @@ COPY . .
 
 ENV AV_CONFIG=/app/appdata/config.yaml
 
-EXPOSE 5000
-CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "0", "web.app:app"]
+EXPOSE 3721
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:3721", "--timeout", "0", "web.app:app"]
