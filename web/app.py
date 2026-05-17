@@ -62,6 +62,8 @@ def load_config():
 
 
 config, config_dir = load_config()
+from src.db import init_db
+init_db(config["db_path"])
 app.config["APP_CONFIG"] = config
 app.config["ROOT_DIR"] = ROOT
 
