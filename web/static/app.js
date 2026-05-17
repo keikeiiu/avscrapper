@@ -383,6 +383,130 @@ async function viewReport(name) {
   }
 }
 
+// ── Pipeline ───────────────────────
+var pipeStartTime = 0;
+var pipeDoneCount = 0;
+var pipeTotal = 6;
+
+function runPipeline() {
+  const btn = document.getElementById('run-pipeline-btn');
+  if (btn.classList.contains('running')) return;
+  btn.classList.add('running');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Running...';
+
+  // Reset all nodes
+  document.querySelectorAll('.pipe-node').forEach(function(n) {
+    n.className = 'pipe-node waiting';
+    n.querySelector('.pipe-node-result').textContent = '';
+  });
+  document.querySelectorAll('.pipe-connector').forEach(function(c) {
+    c.classList.remove('done');
+  });
+  document.getElementById('pipe-log').innerHTML = '';
+  document.getElementById('pipe-error-msg').style.display = 'none';
+  document.getElementById('pipe-spinner').style.display = '';
+  document.getElementById('pipeline-summary').style.display = '';
+  pipeStartTime = Date.now();
+  pipeDoneCount = 0;
+
+  var params = {};
+  if (document.getElementById('opt-dry-run').checked) params.dry_run = true;
+  if (document.getElementById('opt-skip-scrape').checked) params.skip_scrape = true;
+  if (document.getElementById('opt-skip-enrich').checked) params.skip_enrich = true;
+
+  pipeTotal = 6 - (params.skip_scrape ? 2 : 0) - (params.skip_enrich ? 2 : 0);
+  document.getElementById('pipe-progress').textContent = '0 / ' + pipeTotal + ' steps';
+
+  var formData = new URLSearchParams();
+  for (var k in params) { if (params[k]) formData.append(k, '1'); }
+
+  fetch('/api/action/pipeline', { method: 'POST', body: formData })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { showToast(data.error, 'error'); resetPipeBtn(); return; }
+      pipeSSE(data.session);
+    })
+    .catch(function(e) { showToast('Failed to start: ' + e, 'error'); resetPipeBtn(); });
+}
+
+function pipeSSE(session) {
+  if (window._pipeEvents) { window._pipeEvents.close(); }
+  var es = new EventSource('/api/stream?session=' + session);
+  window._pipeEvents = es;
+
+  es.onmessage = function(e) {
+    var msg = JSON.parse(e.data);
+    var logEl = document.getElementById('pipe-log');
+
+    if (msg.type === 'step_start') {
+      setNodeState(msg.step, 'running');
+      appendLog(logEl, '--- ' + msg.label + ' ---');
+    } else if (msg.type === 'step_done') {
+      setNodeState(msg.step, msg.code === 0 ? 'done' : 'error');
+      pipeDoneCount++;
+      updateSummary();
+    } else if (msg.type === 'step_skip') {
+      setNodeState(msg.step, 'skipped');
+      pipeTotal--;
+      updateSummary();
+    } else if (msg.type === 'pipeline_error') {
+      updateSummary(msg.label + ' failed');
+    } else if (msg.type === 'done') {
+      resetPipeBtn();
+      es.close();
+      window._pipeEvents = null;
+      if (msg.code === 0) {
+        showToast('Pipeline completed', 'success');
+        setTimeout(refreshStats, 1000);
+      } else {
+        showToast('Pipeline failed', 'error');
+      }
+    } else if (msg.type === 'log' && logEl) {
+      appendLog(logEl, msg.line);
+    }
+  };
+
+  es.onerror = function() {
+    es.close();
+    window._pipeEvents = null;
+    resetPipeBtn();
+  };
+}
+
+function setNodeState(step, state) {
+  var node = document.getElementById('node-' + step);
+  if (!node) return;
+  node.className = 'pipe-node ' + state;
+
+  // Color the connector ABOVE this node
+  var conn = document.getElementById('conn-' + step);
+  if (conn && (state === 'done' || state === 'skipped')) {
+    conn.classList.add('done');
+  }
+}
+
+function updateSummary(errMsg) {
+  var elapsed = Math.round((Date.now() - pipeStartTime) / 1000);
+  var m = Math.floor(elapsed / 60);
+  var s = elapsed % 60;
+  document.getElementById('pipe-elapsed').textContent = (m ? m + 'm ' : '') + s + 's';
+  document.getElementById('pipe-progress').textContent = pipeDoneCount + ' / ' + pipeTotal + ' steps';
+  if (errMsg) {
+    var el = document.getElementById('pipe-error-msg');
+    el.textContent = errMsg;
+    el.style.display = '';
+  }
+}
+
+function resetPipeBtn() {
+  var btn = document.getElementById('run-pipeline-btn');
+  btn.classList.remove('running');
+  btn.disabled = false;
+  btn.innerHTML = '&#9654; Run Pipeline';
+  document.getElementById('pipe-spinner').style.display = 'none';
+}
+
 // ── Helpers ────────────────────────
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Pipeline</h2>
+<p class="dim">Runs all steps sequentially: ingest → scrape → enrich → reorganize.</p>
+
+<div class="pipeline-ctl">
+  <label class="check-label"><input type="checkbox" id="opt-dry-run"> Dry run (preview only)</label>
+  <label class="check-label"><input type="checkbox" id="opt-skip-scrape"> Skip scraping</label>
+  <label class="check-label"><input type="checkbox" id="opt-skip-enrich"> Skip enrichment</label>
+  <div style="flex:1"></div>
+  <button class="btn" id="run-pipeline-btn" onclick="runPipeline()">&#9654; Run Pipeline</button>
+</div>
+
+<div id="pipeline-summary" class="pipeline-summary" style="display:none">
+  <span id="pipe-elapsed">0s</span>
+  <span id="pipe-progress">0 / 6 steps</span>
+  <span id="pipe-error-msg" class="red" style="display:none"></span>
+</div>
+
+<div class="pipeline-flow" id="pipeline-flow">
+  {% set steps = [
+    ("ingest", "Ingest", "Scan downloads, detect videos, seed DB"),
+    ("scrape_fc2", "Scrape FC2", "Fetch metadata from fc2ppvdb.com"),
+    ("scrape_jav", "Scrape JAV", "Fetch metadata from javdb.com"),
+    ("enrich_fc2", "Enrich FC2", "Write Kodi NFO files for FC2"),
+    ("enrich_jav", "Enrich JAV", "Write Kodi NFO files for JAV"),
+    ("reorganize", "Reorganize", "Move into metadata-driven hierarchy"),
+  ] %}
+  {% for key, label, desc in steps %}
+  <div class="pipe-node" id="node-{{ key }}" data-step="{{ key }}">
+    <div class="pipe-node-icon"><span class="pipe-dot"></span></div>
+    <div class="pipe-node-body">
+      <div class="pipe-node-label">{{ label }}</div>
+      <div class="pipe-node-desc">{{ desc }}</div>
+      <div class="pipe-node-result"></div>
+    </div>
+  </div>
+  {% if not loop.last %}
+  <div class="pipe-connector" id="conn-{{ key }}"></div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<h3 style="margin-top: 24px;">Live Output <span id="pipe-spinner" style="display:none"><span class="spinner"></span> running...</span></h3>
+<div class="log-panel" id="pipe-log">
+  <span class="dim">Output appears here when the pipeline is running.</span>
+</div>
+{% endblock %}

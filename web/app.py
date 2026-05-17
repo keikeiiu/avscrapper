@@ -121,6 +121,11 @@ def config_page():
     return render_template("config.html")
 
 
+@app.route("/pipeline")
+def pipeline_page():
+    return render_template("pipeline.html")
+
+
 @app.route("/api/report/<name>")
 def api_report(name):
     reports_dir = config.get("report_dir", os.path.join(ROOT, "reports"))
