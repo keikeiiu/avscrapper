@@ -1,7 +1,12 @@
 FROM python:3.12-slim
 
-# Install everything in one layer, then clean aggressively
-RUN pip install --no-cache-dir pyyaml playwright flask gunicorn markdown \
+WORKDIR /app
+
+# Copy requirements first for layer caching
+COPY requirements.txt .
+
+# Install deps + chromium, then clean aggressively
+RUN pip install --no-cache-dir -r requirements.txt \
     && playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip \
     # Strip Chromium to essentials (keep en-US + ja for safety)
@@ -12,7 +17,7 @@ RUN pip install --no-cache-dir pyyaml playwright flask gunicorn markdown \
          rm -rf "$CHROMIUM"/MEIPreload 2>/dev/null; \
        fi
 
-WORKDIR /app
+# Copy application code
 COPY . .
 
 ENV AV_CONFIG=/app/appdata/config.yaml
