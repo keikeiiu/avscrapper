@@ -119,7 +119,7 @@ pip install flask gunicorn
 # Start (development)
 python -m web.app
 
-# Open http://localhost:5000
+# Open http://localhost:3721
 ```
 
 **Pages:**
@@ -128,7 +128,7 @@ python -m web.app
 - **Database** — browse FC2/JAV entries with filters, search, sort, expand rows, flag entries
 - **Logs** — view report files and live session output
 
-**Docker:** The Docker image starts the web GUI by default on port 5000. CLI access is still available via `docker compose run avscraper python avscraper.py ...`. See [README.docker.md](README.docker.md).
+**Docker:** The Docker image starts the web GUI on port 3721 (mapped from internal 5000). CLI access is still available via `docker compose run avscraper python avscraper.py ...`. See [README.docker.md](README.docker.md).
 
 ## Credits
 

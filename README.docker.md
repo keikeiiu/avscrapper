@@ -10,7 +10,7 @@ services:
     image: keikeiiu/avscraper:latest
     container_name: avscraper
     ports:
-      - "5000:5000"
+      - "3721:5000"
     volumes:
       - ./downloads:/app/downloads
       - ./processed:/app/processed
@@ -51,8 +51,8 @@ sites:
 # Start the web GUI (default)
 docker compose up -d
 
-# Open http://localhost:5000 in your browser
-# For NAS: http://<nas-ip>:5000
+# Open http://localhost:3721 in your browser
+# For NAS: http://<nas-ip>:3721
 ```
 
 The web GUI lets you trigger all actions, watch live logs, and browse the database.
@@ -99,7 +99,7 @@ Same commands work — just replace `docker compose run avscraper` with the `doc
 - All data lives in Docker volumes + your mounted folders — nothing is lost on restart
 - DB file persists across runs (in the `av_data` volume)
 - Reports go to `./reports/` folder on your host
-- Web GUI runs on port 5000 by default — change with `ports: "8080:5000"` in docker-compose.yml
+- Web GUI runs on port 3721 by default — change the external port in docker-compose.yml if needed
 - Add `--delay "5-20"` for random delays to avoid rate limiting
 - CLI commands now need the full path: `docker compose run avscraper python avscraper.py ...`
 - Only one action runs at a time (single gunicorn worker) — safe for Playwright/Chromium
