@@ -1,8 +1,9 @@
 # AV Scraper — Web GUI + CLI
-# docker compose up              → start web GUI on http://localhost:5000
+# docker compose up -d            → start web GUI (background)
 # docker compose run avscraper python avscraper.py ...  → CLI mode
 #
-# CLI actions are also available from the web GUI at /actions
+# Port: change "8080" to any free port on your host.
+# Run `docker ps` or `ss -tlnp` to check what's in use.
 
 services:
   avscraper:
@@ -10,7 +11,7 @@ services:
     build: .
     container_name: avscraper
     ports:
-      - "5000:5000"
+      - "8080:5000"   # external:internal — change 8080 if needed
     volumes:
       - ./downloads:/app/downloads
       - ./processed:/app/processed
@@ -19,6 +20,7 @@ services:
       - av_data:/app
     environment:
       - AV_CONFIG=/app/config.yaml
+    restart: unless-stopped
     stdin_open: true
     tty: true
 
