@@ -4,10 +4,10 @@ FROM python:3.12-slim
 RUN pip install --no-cache-dir pyyaml playwright flask gunicorn markdown \
     && playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip \
-    # Strip Chromium to essentials
+    # Strip Chromium to essentials (keep en-US + ja for safety)
     && CHROMIUM=$(find /root/.cache/ms-playwright -name chrome-linux64 -type d | head -1) \
     && if [ -n "$CHROMIUM" ]; then \
-         rm -rf "$CHROMIUM"/locales/*.pak 2>/dev/null; \
+         find "$CHROMIUM"/locales -name '*.pak' ! -name 'en-US.pak' ! -name 'ja.pak' -delete 2>/dev/null; \
          rm -rf "$CHROMIUM"/swiftshader 2>/dev/null; \
          rm -rf "$CHROMIUM"/MEIPreload 2>/dev/null; \
        fi
