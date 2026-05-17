@@ -4,7 +4,7 @@ Produces Kodi-compliant NFOs with <uniqueid>, <sorttitle>, <originaltitle>,
 <runtime>, <art><poster>, plus legacy <num>/<website> as extensions.
 """
 
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
 from xml.sax.saxutils import escape as _xml_escape
 
 

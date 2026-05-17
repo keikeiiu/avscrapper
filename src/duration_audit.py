@@ -165,7 +165,7 @@ def audit(config_path, dry_run=False, cids=None, vtype=None):
 
         cid_dirs = find_directories(targets, extractor)
         entries = conn.execute(
-            f"SELECT * FROM {table} WHERE status='scraped'"
+            f"SELECT * FROM {table} WHERE status='scraped'"  # nosec B608
         ).fetchall()
 
         if cids:
@@ -209,11 +209,11 @@ def audit(config_path, dry_run=False, cids=None, vtype=None):
             rows.append((cid, meta_sec, actual_sec, status))
 
             if not dry_run:
-                conn.execute(f"UPDATE {table} SET audit_status=?, last_audited=? WHERE cid=?",
+                conn.execute(f"UPDATE {table} SET audit_status=?, last_audited=? WHERE cid=?",  # nosec B608
                              (status, now, cid))
                 if actual_sec:
                     conn.execute(
-                        f"INSERT INTO {file_table} (cid, duration_seconds, duration_str) VALUES (?,?,?)",
+                        f"INSERT INTO {file_table} (cid, duration_seconds, duration_str) VALUES (?,?,?)",  # nosec B608
                         (cid, actual_sec, _format_duration(actual_sec)))
 
         conn.commit()

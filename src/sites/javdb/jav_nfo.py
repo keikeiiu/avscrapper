@@ -4,7 +4,7 @@ Richer than FC2: nested <actor> elements, <label>, <series>, <director>,
 <rating>, <votes>, multiple <genre>/<tag>, <art> with poster+fanart.
 """
 
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
 from xml.sax.saxutils import escape as _xml_escape
 
 
