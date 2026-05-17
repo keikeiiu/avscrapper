@@ -104,7 +104,7 @@ function updateForm() {
   if (!sel) { div.innerHTML = ''; return; }
 
   const specs = {
-    ingest:       {fields: [{name:'source',label:'Source dir',type:'text',def:'downloads/'},{name:'yes',label:'Auto-confirm',type:'check'}]},
+    ingest:       {fields: [{name:'source',label:'Source dir (optional)',type:'text'},{name:'yes',label:'Auto-confirm',type:'check'}]},
     scrape_fc2:   {fields: [{name:'ids',label:'CIDs (optional)',type:'text'},{name:'delay',label:'Delay',type:'text',def:'5-20'},{name:'flagged',label:'Flagged only',type:'check'},{name:'retry_errors',label:'Retry errors',type:'check'}]},
     scrape_jav:   {fields: [{name:'ids',label:'CIDs (optional)',type:'text'},{name:'delay',label:'Delay',type:'text',def:'5-20'},{name:'flagged',label:'Flagged only',type:'check'},{name:'retry_errors',label:'Retry errors',type:'check'}]},
     enrich_fc2:   {fields: [{name:'ids',label:'CIDs (optional)',type:'text'}]},
