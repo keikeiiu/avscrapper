@@ -38,15 +38,12 @@ if not os.path.isfile(config_yaml):
         with open(config_yaml, encoding="utf-8") as f:
             cfg = _yaml.safe_load(f)
         if _is_desktop:
-            # Desktop: write paths into the user's appdata directory
+            # Desktop: point db + reports into the user's private appdata directory.
+            # Video paths are left as relative defaults from config.example.yaml
+            # (e.g. ./downloads, ./processed) — user configures real paths via the
+            # web UI config editor.
             cfg["db_path"] = os.path.join(_appdata, "av_data.db").replace("\\", "/")
             cfg["report_dir"] = os.path.join(_appdata, "reports").replace("\\", "/")
-            ing = cfg.setdefault("ingest", {})
-            downloads = os.path.join(os.path.expanduser("~"), "Downloads")
-            ing["source"] = os.path.join(downloads, "new fc2").replace("\\", "/")
-            ing["fc2_target"] = os.path.join(downloads, "processed_").replace("\\", "/")
-            ing["jav_target"] = os.path.join(downloads, "processed_").replace("\\", "/")
-            cfg.setdefault("reorganize", {})["target"] = os.path.join(downloads, "reorganized_").replace("\\", "/")
             os.makedirs(cfg["report_dir"], exist_ok=True)
         elif config_yaml.startswith("/app/"):
             # Docker: rewrite paths to absolute (relative breaks when config is in subdirectory)
