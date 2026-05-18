@@ -79,19 +79,19 @@ jobs:
           cd $root
           $config = @"
           ^;!@Install@!UTF-8!
-          Title="AV Scraper"
-          RunProgram="AV Scraper.exe"
+          Title="avscrapper"
+          RunProgram="avscrapper.exe"
           ^;!@InstallEnd@!
           "@
           [System.IO.File]::WriteAllText("$root\sfx-config.txt", $config)
           & "C:\Program Files\7-Zip\7z.exe" a -mx5 avscraper.7z ".\win-unpacked\*"
-          $sfx = "$root\AVScraper-Portable.exe"
+          $sfx = "$root\avscrapper-portable.exe"
           cmd /c "copy /b `"C:\Program Files\7-Zip\7z.sfx`" + sfx-config.txt + avscraper.7z `"$sfx`""
           Remove-Item "$root\avscraper.7z", "$root\sfx-config.txt"
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: desktop/output/AVScraper-Portable.exe
+          files: desktop/output/avscrapper-portable.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

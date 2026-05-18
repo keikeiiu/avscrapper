@@ -10,6 +10,22 @@ ROOT = os.path.dirname(HERE)
 PYTHON_DIST = os.path.join(HERE, "python-dist")
 IS_WIN = platform.system() == "Windows"
 
+# Resolve node/npm/npx paths (not always in subprocess PATH on Windows)
+def _find_cmd(name):
+    """Find command in common install locations."""
+    for base in [os.environ.get("ProgramFiles", "C:\\Program Files"),
+                 os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"),
+                 os.path.expanduser("~\\AppData\\Roaming\\nvm"),
+                 os.path.expanduser("~\\AppData\\Local\\Programs")]:
+        for sub in [name + ".exe", name + ".cmd", os.path.join("nodejs", name + ".exe")]:
+            p = os.path.join(base, sub)
+            if os.path.isfile(p):
+                return p
+    return name  # fallback to bare name (hope it's in PATH)
+
+NPM = _find_cmd("npm")
+NPX = _find_cmd("npx")
+
 
 def step(msg):
     print(f"\n=== {msg} ===")
@@ -87,11 +103,11 @@ def main():
     # 4. Install npm deps
     step("Install npm dependencies")
     if not os.path.isdir(os.path.join(HERE, "node_modules")):
-        run(["npm", "install"])
+        run([NPM, "install"])
 
     # 5. Electron-builder (unpacked — avoids Windows code-signing symlink issues)
     step("Electron-builder: package app")
-    run(["npx", "electron-builder", "--dir", "--win"])
+    run([NPX, "electron-builder", "--dir", "--win"])
 
     # electron-builder filters directories starting with _ (like _internal)
     # Copy it manually so the frozen Python runtime can find python312.dll
@@ -114,7 +130,7 @@ def main():
     # 6. Self-extracting archive (one-click portable .exe)
     step("Create self-extracting archive")
     unpacked = os.path.join(HERE, "output", "win-unpacked")
-    sfx_exe = os.path.join(HERE, "output", "AVScraper-1.0.1-Portable.exe")
+    sfx_exe = os.path.join(HERE, "output", "avscrapper-1.0.1-Portable.exe")
     sfx_mod = os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"),
                            "7-Zip", "7z.sfx")
     if not os.path.isfile(sfx_mod):
@@ -130,7 +146,7 @@ def main():
         with open(config, "w", encoding="ascii") as f:
             f.write("^;!@Install@!UTF-8!\r\n")
             f.write('Title="AV Scraper"\r\n')
-            f.write('RunProgram="AV Scraper.exe"\r\n')
+            f.write('RunProgram="avscrapper.exe"\r\n')
             f.write("^;!@InstallEnd@!\r\n")
         # Combine: SFX module + config + 7z archive
         with open(sfx_exe, "wb") as out:

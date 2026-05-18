@@ -15,7 +15,7 @@
   },
   "build": {
     "appId": "com.keikeiiu.avscraper",
-    "productName": "AV Scraper",
+    "productName": "avscrapper",
     "directories": {
       "output": "output"
     },
