@@ -36,23 +36,23 @@ jobs:
 
       - name: PyInstaller — freeze backend
         run: |
+          $root = "${{ github.workspace }}"
           python -m PyInstaller --onedir --name avscraper-backend `
-            --distpath desktop\python-dist `
-            --workpath desktop\pyinstaller-work `
-            --specpath desktop `
+            --distpath "$root\desktop\python-dist" `
+            --workpath "$root\desktop\pyinstaller-work" `
+            --specpath "$root\desktop" `
             --hidden-import flask --hidden-import markdown --hidden-import yaml `
             --hidden-import defusedxml --hidden-import playwright `
             --hidden-import web.process_manager `
-            --add-data "web\templates;web\templates" `
-            --add-data "web\static;web\static" `
-            --add-data "web\routes;web\routes" `
-            --add-data "src;src" `
-            --add-data "config.example.yaml;." `
-            web\app.py
-          # Bundle Playwright Chromium
+            --add-data "$root\web\templates;web\templates" `
+            --add-data "$root\web\static;web\static" `
+            --add-data "$root\web\routes;web\routes" `
+            --add-data "$root\src;src" `
+            --add-data "$root\config.example.yaml;." `
+            "$root\web\app.py"
           $browsers = "$env:USERPROFILE\AppData\Local\ms-playwright"
           if (Test-Path $browsers) {
-            Copy-Item -Recurse $browsers desktop\python-dist\avscraper-backend\_internal\ms-playwright
+            Copy-Item -Recurse $browsers "$root\desktop\python-dist\avscraper-backend\_internal\ms-playwright"
           }
 
       - name: Electron-builder — package portable
