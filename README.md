@@ -8,6 +8,15 @@ downloads/  →  ingest  →  processed/  →  scrape  →  enrich  →  reorgan
                     sort into folders)   to SQLite)    files)      from templates)
 ```
 
+## Quick Start (Desktop App)
+
+Download the latest `AVScraper-*-portable.exe` from [Releases](https://github.com/keikeiiu/avscrapper/releases), double-click to launch.
+
+- No Docker, no terminal, no setup — just run the `.exe`
+- Web GUI opens in a native window
+- Config, DB, and reports stored in `%APPDATA%/avscraper/`
+- See [desktop/README.md](desktop/README.md) for details
+
 ## Quick Start (Docker Compose)
 
 ```bash
@@ -110,6 +119,7 @@ python -m playwright install chromium
 | [README.fc2ppv.md](README.fc2ppv.md) | FC2 scraper — implementation, config, cookies |
 | [README.javdb.md](README.javdb.md) | JavDB scraper — implementation, config, cookies |
 | [README.webgui.md](README.webgui.md) | Web GUI — dashboard, pipeline, actions, database, config editor |
+| [desktop/README.md](desktop/README.md) | Desktop app — build, distribute, architecture |
 | [PLAN.md](PLAN.md) | Architecture overview, status, future roadmap |
 
 ## Pipeline
