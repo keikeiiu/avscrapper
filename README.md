@@ -8,14 +8,20 @@ downloads/  →  ingest  →  processed/  →  scrape  →  enrich  →  reorgan
                     sort into folders)   to SQLite)    files)      from templates)
 ```
 
-## Quick Start (Desktop App)
+## Quick Start (Desktop App) ![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)
 
-Download the latest `AVScraper-*-portable.exe` from [Releases](https://github.com/keikeiiu/avscrapper/releases), double-click to launch.
+Download from [GitHub Releases](https://github.com/keikeiiu/avscrapper/releases/latest):
 
-- No Docker, no terminal, no setup — just run the `.exe`
-- Web GUI opens in a native window
-- Config, DB, and reports stored in `%APPDATA%/avscraper/`
-- See [desktop/README.md](desktop/README.md) for details
+| File | What |
+|------|------|
+| `AVScraper-1.x.x-portable.zip` | Extract anywhere, double-click `AV Scraper.exe` |
+| `AVScraper-Setup.exe` | Single-file self-extracting installer |
+
+**No Docker, no terminal, no setup.** Launch and the web GUI opens in its own window. Everything (config, database, reports) lives in `%APPDATA%/avscrapper/`.
+
+On first run, a config file is seeded automatically pointing to your Downloads folder. Edit cookies and paths via the built-in Config page.
+
+See [desktop/README.md](desktop/README.md) for build instructions and architecture.
 
 ## Quick Start (Docker Compose)
 
