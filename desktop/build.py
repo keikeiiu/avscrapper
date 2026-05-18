@@ -30,6 +30,14 @@ def main():
     if os.path.isfile(spec):
         os.remove(spec)
 
+    # Clean __pycache__ from source dirs (locally-stale bytecode, not needed in CI)
+    step("Clean __pycache__ from source")
+    for scan_dir in [os.path.join(ROOT, "src"), os.path.join(ROOT, "web")]:
+        for root, dirs, _files in os.walk(scan_dir):
+            if "__pycache__" in dirs:
+                shutil.rmtree(os.path.join(root, "__pycache__"))
+    print("  Done")
+
     # 2. Generate icon
     step("Generate app icon")
     icon_dir = os.path.join(HERE, "icons")
@@ -96,6 +104,12 @@ def main():
         shutil.rmtree(internal_dst)
     shutil.copytree(internal_src, internal_dst)
     print(f"  Copied _internal/ to electron output")
+
+    # Remove appdata/ if leaked from a test run (contains local paths + empty DB)
+    appdata_dst = os.path.join(backend_out, "appdata")
+    if os.path.isdir(appdata_dst):
+        shutil.rmtree(appdata_dst)
+        print(f"  Removed leaked appdata/ from electron output")
 
     # 6. Self-extracting archive (one-click portable .exe)
     step("Create self-extracting archive")

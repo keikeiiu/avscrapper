@@ -63,3 +63,22 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## Desktop Build Procedure
+
+When building the Electron desktop app (`cd desktop && python build.py`):
+
+1. **Never test-run `avscraper-backend.exe` in the `python-dist/` directory before packaging.** The first-run code in `web/app.py` creates `appdata/config.yaml` with `os.path.expanduser("~")` paths, which leaks the local username and directory structure into the distributable.
+
+2. **If you must test the backend exe**, remove `appdata/` from `python-dist/avscraper-backend/` before running `build.py` (or let `build.py` step 1 handle it — it cleans the entire `python-dist/`).
+
+3. **`build.py` handles cleanup automatically:**
+   - Step 1: Clears `python-dist/`, `pyinstaller-work/`, `output/`, stale `.spec` files
+   - Also cleans `__pycache__/` from `src/` and `web/`
+   - After electron-builder: copies `_internal/` into the output (electron-builder filters underscore-prefixed dirs)
+   - Removes any leaked `appdata/` from the output
+   - Step 6: Creates the self-extracting `.exe` via 7-Zip SFX
+
+4. **`package.json` `build.files`** limits `app.asar` to `main.js`, `preload.js`, `package.json`, `icons/` — no build scripts, no `pyinstaller-work/`, no duplicate `python-dist/`.
+
+5. **CI is clean by default** (fresh checkout), but the same `appdata/` cleanup step exists as belt-and-suspenders.

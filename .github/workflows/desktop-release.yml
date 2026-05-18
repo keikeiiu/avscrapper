@@ -65,6 +65,14 @@ jobs:
           $dst = "${{ github.workspace }}\desktop\output\win-unpacked\resources\python-dist\avscraper-backend\_internal"
           Copy-Item -Recurse $src $dst
 
+      - name: Remove leaked appdata from electron output
+        run: |
+          $appdata = "${{ github.workspace }}\desktop\output\win-unpacked\resources\python-dist\avscraper-backend\appdata"
+          if (Test-Path $appdata) {
+            Remove-Item -Recurse -Force $appdata
+            Write-Host "Removed leaked appdata/ from electron output"
+          }
+
       - name: Build self-extracting archive (SFX)
         run: |
           $root = "${{ github.workspace }}\desktop\output"
