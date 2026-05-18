@@ -162,3 +162,6 @@ docker compose run avscraper python avscraper.py pipeline
 | [PyYAML](https://pyyaml.org) | Config parsing | MIT |
 | [Gunicorn](https://gunicorn.org) | WSGI server | MIT |
 | [defusedxml](https://pypi.org/project/defusedxml/) | Safe XML parsing | PSF |
+| [Electron](https://www.electronjs.org) | Desktop app shell | MIT |
+| [PyInstaller](https://pyinstaller.org) | Python-to-exe bundling | GPLv2 |
+| [Pillow](https://python-pillow.org) | Icon generation | MIT-CMU |
