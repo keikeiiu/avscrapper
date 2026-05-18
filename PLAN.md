@@ -149,10 +149,12 @@ See [README.cli.md](README.cli.md) for full reference.
 
 | Language | Frozen size | Verdict |
 |----------|-------------|---------|
-| **Python** (current) | ~60 MB | Right choice — rapid dev, huge ecosystem. Rewrite in Go/Rust would be months for marginal benefit |
-| Go | ~10 MB | Compiled, fast, great CLI. But Playwright bindings are immature |
+| **Python** (current) | ~60 MB | Right choice — rapid dev, huge ecosystem. Rewrite would be months for marginal benefit |
+| C# (.NET AOT) | ~15-30 MB | Strong candidate — official Playwright bindings, native Windows interop, good web framework (ASP.NET). Worth considering for a v2 if Windows-only |
+| Go | ~10 MB | Compiled, fast, great CLI. Playwright bindings are immature |
 | Rust | ~5 MB | Smallest/fastest. Significantly slower to write for scraper complexity |
 | Node.js | Already in Electron | Could merge backend into Electron main process, but adds complexity |
+| C++ | ~3 MB | Maximum performance but painful for DOM/HTML work. No meaningful Playwright binding. Wrong tool for this job |
 
 ### Database
 
