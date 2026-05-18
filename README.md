@@ -169,5 +169,7 @@ docker compose run avscraper python avscraper.py pipeline
 | [Gunicorn](https://gunicorn.org) | WSGI server | MIT |
 | [defusedxml](https://pypi.org/project/defusedxml/) | Safe XML parsing | PSF |
 | [Electron](https://www.electronjs.org) | Desktop app shell | MIT |
-| [PyInstaller](https://pyinstaller.org) | Python-to-exe bundling | GPLv2 |
+| [electron-builder](https://www.electron.build) | Desktop packaging | MIT |
+| [PyInstaller](https://pyinstaller.org) | Python-to-exe bundling | GPLv2+ (with bootloader exception — does not extend to bundled applications) |
 | [Pillow](https://python-pillow.org) | Icon generation | MIT-CMU |
+| [7-Zip](https://7-zip.org) | Self-extracting archive | LGPL |
