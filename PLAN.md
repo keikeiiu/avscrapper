@@ -11,7 +11,15 @@ avscrapper/
 ├── requirements.txt          # pyyaml, playwright, flask, gunicorn, markdown, defusedxml
 ├── .github/workflows/
 │   ├── docker-publish.yml    # build + push to Docker Hub on main push
+│   ├── desktop-release.yml   # build Windows portable .exe (manual trigger)
 │   └── python-audit.yml      # Bandit SAST + pip-audit on src/** changes
+├── desktop/                  # Electron desktop app
+│   ├── main.js               # Electron main process
+│   ├── preload.js            # IPC bridge
+│   ├── package.json          # Electron + electron-builder config
+│   ├── build.py              # PyInstaller + electron-builder → SFX
+│   ├── icons/                # App icons
+│   └── README.md
 ├── web/                      # Flask web GUI
 │   ├── app.py                # app factory, config load, first-run init
 │   ├── routes/
@@ -58,7 +66,9 @@ avscrapper/
 | Duration audit (ffprobe, two-tier flagging) | ✅ |
 | Web GUI (dashboard, actions, DB browser, logs, config editor, SSE) | ✅ |
 | Docker image + Compose (4 mounts, first-run auto-config) | ✅ |
-| GitHub Actions CI (Docker publish + Python audit) | ✅ |
+| GitHub Actions CI (Docker publish + Desktop release + Python audit) | ✅ |
+| Desktop app (Electron + PyInstaller + SFX, portable .exe) | ✅ |
+| Desktop build audit (no personal data leaks, clean distributable) | ✅ |
 | Security (defusedxml, Bandit/pip-audit, SQL nosec) | ✅ |
 | Path resolution (AV_CONFIG env var, config-dir relative, absolute fallback) | ✅ |
 | NFO-first import (skip web scrape if NFO exists in video folder) | ✅ |
@@ -123,5 +133,4 @@ See [README.cli.md](README.cli.md) for full reference.
 |------|-------|
 | Uncensored JAV scraper | 123011-900 pattern. Caribbean/1Pondo/Heyzo |
 | JavBus fallback | When JavDB returns 404 |
-| F-drive batch scrape | 617 FC2 IDs pending |
 | Obscura browser backend | Evaluate when more mature. CDP-compatible drop-in for Chromium, ~30MB memory, built-in anti-fingerprinting. Would replace Playwright's bundled Chromium via `connect_over_cdp`. Risk: early-stage. |

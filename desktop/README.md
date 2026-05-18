@@ -4,12 +4,12 @@ Standalone desktop app for Windows. No Docker, no terminal, no setup — double-
 
 ## Download
 
-Get the latest `AVScraper-*-portable.exe` from [GitHub Releases](https://github.com/keikeiiu/avscrapper/releases).
+Get the latest `avscrapper-portable.exe` from [GitHub Releases](https://github.com/keikeiiu/avscrapper/releases).
 
 ## How it works
 
 ```
-AV Scraper.exe
+avscrapper.exe
 ├── Electron shell           ← native window, system tray
 ├── Python backend (frozen)  ← Flask web server, auto-started
 └── Playwright Chromium      ← bundled for scraping
@@ -50,7 +50,7 @@ python build.py
 
 This runs PyInstaller (freeze Python backend) then electron-builder (package into portable .exe).
 
-Output: `desktop/output/AVScraper-1.0.0-portable.tar.gz`
+Output: `desktop/output/avscrapper-1.0.1-Portable.exe`
 
 ## Architecture
 

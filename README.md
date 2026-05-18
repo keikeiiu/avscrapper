@@ -14,12 +14,11 @@ Download from [GitHub Releases](https://github.com/keikeiiu/avscrapper/releases/
 
 | File | What |
 |------|------|
-| `AVScraper-1.x.x-portable.zip` | Extract anywhere, double-click `AV Scraper.exe` |
-| `AVScraper-Setup.exe` | Single-file self-extracting installer |
+| `avscrapper-portable.exe` | Single-file self-extracting — put it anywhere, double-click |
 
 **No Docker, no terminal, no setup.** Launch and the web GUI opens in its own window. Everything (config, database, reports) lives in `%APPDATA%/avscrapper/`.
 
-On first run, a config file is seeded automatically pointing to your Downloads folder. Edit cookies and paths via the built-in Config page.
+On first run, a config file is seeded with relative paths (`./downloads`, `./processed`, `./reorganized`). Set your real folders and cookies via the built-in Config page.
 
 See [desktop/README.md](desktop/README.md) for build instructions and architecture.
 
