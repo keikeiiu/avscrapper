@@ -55,13 +55,18 @@ jobs:
             Copy-Item -Recurse $browsers "$root\desktop\python-dist\avscraper-backend\_internal\ms-playwright"
           }
 
-      - name: Electron-builder — package portable
+      - name: Electron-builder — package unpacked
         working-directory: desktop
-        run: npx electron-builder --win portable
+        run: npx electron-builder --dir --win
+
+      - name: Archive for distribution
+        run: |
+          $root = "${{ github.workspace }}"
+          Compress-Archive -Path "$root\desktop\output\win-unpacked\*" -DestinationPath "$root\desktop\output\AVScraper-portable.zip"
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: desktop/output/AVScraper-*-portable.exe
+          files: desktop/output/AVScraper-portable.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
