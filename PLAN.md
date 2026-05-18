@@ -121,6 +121,43 @@ See [README.cli.md](README.cli.md) for full reference.
 
 | Item | Notes |
 |------|-------|
+| macOS desktop build | Package config exists (`dmg` target in electron-builder). Need: PyInstaller on macOS runner, CI workflow variant, testing. Playwright/Chromium + Python backend already cross-platform. |
+| Tauri shell (replace Electron) | Rust-based desktop wrapper. Binary ~5 MB vs Electron's 180 MB. Would need a Rust shim layer for IPC to the Python backend. Much smaller distributable. Risk: moderate — Tauri is stable but IPC bridge would need custom work. |
 | Uncensored JAV scraper | 123011-900 pattern. Caribbean/1Pondo/Heyzo |
 | JavBus fallback | When JavDB returns 404 |
 | Obscura browser backend | Evaluate when more mature. CDP-compatible drop-in for Chromium, ~30MB memory, built-in anti-fingerprinting. Would replace Playwright's bundled Chromium via `connect_over_cdp`. Risk: early-stage. |
+
+## Tech Stack Analysis (2026-05)
+
+### Headless browser
+
+| Option | Bundle | Verdict |
+|--------|--------|---------|
+| **Playwright Chromium** (current) | ~150 MB | Right choice — both target sites require JS rendering + cookie auth. Bare HTTP won't work. |
+| Playwright Firefox | ~100 MB | Viable drop-in, smaller but same API |
+| Obscura | ~30 MB | Promising CDP-compatible alternative. Not production-ready yet. |
+
+### Frontend
+
+| Option | Bundle | Verdict |
+|--------|--------|---------|
+| **Flask + Jinja2 + vanilla JS** (current) | ~3 MB | Right choice — zero build step, sufficient for a single-user local tool |
+| HTMX + Alpine.js | ~50 KB | Could simplify the JS further, keep Flask backend |
+| React/Vue/Svelte | +5-10 MB | Overkill for this scope |
+
+### Backend language
+
+| Language | Frozen size | Verdict |
+|----------|-------------|---------|
+| **Python** (current) | ~60 MB | Right choice — rapid dev, huge ecosystem. Rewrite in Go/Rust would be months for marginal benefit |
+| Go | ~10 MB | Compiled, fast, great CLI. But Playwright bindings are immature |
+| Rust | ~5 MB | Smallest/fastest. Significantly slower to write for scraper complexity |
+| Node.js | Already in Electron | Could merge backend into Electron main process, but adds complexity |
+
+### Database
+
+| Option | Verdict |
+|--------|---------|
+| **SQLite** (current) | Right choice — single file, zero config, perfect for 4-table metadata store |
+| DuckDB | Overkill for simple metadata queries |
+| JSON files | No query capability, easy to corrupt |
