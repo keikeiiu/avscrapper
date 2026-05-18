@@ -14,7 +14,7 @@ const pythonDist = isDev
 
 function getBackendExe() {
   const ext = process.platform === 'win32' ? '.exe' : '';
-  return path.join(pythonDist, `avscraper-backend${ext}`);
+  return path.join(pythonDist, 'avscraper-backend', `avscraper-backend${ext}`);
 }
 
 function getAppDataDir() {

@@ -85,20 +85,57 @@ def main():
     step("Electron-builder: package app")
     run(["npx", "electron-builder", "--dir", "--win"])
 
-    # 6. Archive for distribution
-    step("Create distribution archive")
-    import tarfile
+    # electron-builder filters directories starting with _ (like _internal)
+    # Copy it manually so the frozen Python runtime can find python312.dll
+    step("Copy PyInstaller _internal into electron output")
+    backend_out = os.path.join(HERE, "output", "win-unpacked", "resources",
+                               "python-dist", "avscraper-backend")
+    internal_src = os.path.join(PYTHON_DIST, "avscraper-backend", "_internal")
+    internal_dst = os.path.join(backend_out, "_internal")
+    if os.path.isdir(internal_dst):
+        shutil.rmtree(internal_dst)
+    shutil.copytree(internal_src, internal_dst)
+    print(f"  Copied _internal/ to electron output")
+
+    # 6. Self-extracting archive (one-click portable .exe)
+    step("Create self-extracting archive")
     unpacked = os.path.join(HERE, "output", "win-unpacked")
-    archive = os.path.join(HERE, "output", "AVScraper-1.0.0-portable.tar.gz")
-    with tarfile.open(archive, "w:gz") as tar:
-        for item in os.listdir(unpacked):
-            tar.add(os.path.join(unpacked, item), arcname=item)
-    size_mb = os.path.getsize(archive) / (1024 * 1024)
-    print(f"  {archive} ({size_mb:.0f} MB)")
+    sfx_exe = os.path.join(HERE, "output", "AVScraper-1.0.1-Portable.exe")
+    sfx_mod = os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"),
+                           "7-Zip", "7z.sfx")
+    if not os.path.isfile(sfx_mod):
+        sfx_mod = os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"),
+                               "7-Zip", "7z.sfx")
+    if os.path.isfile(sfx_mod):
+        # Build 7z archive
+        archive_7z = os.path.join(HERE, "output", "avscraper.7z")
+        subprocess.run(["7z", "a", "-mx5", archive_7z, os.path.join(unpacked, "*")],
+                       check=True, cwd=os.path.join(HERE, "output"))
+        # Write SFX config (no prompt = one-click)
+        config = os.path.join(HERE, "output", "sfx-config.txt")
+        with open(config, "w", encoding="ascii") as f:
+            f.write("^;!@Install@!UTF-8!\r\n")
+            f.write('Title="AV Scraper"\r\n')
+            f.write('RunProgram="AV Scraper.exe"\r\n')
+            f.write("^;!@InstallEnd@!\r\n")
+        # Combine: SFX module + config + 7z archive
+        with open(sfx_exe, "wb") as out:
+            with open(sfx_mod, "rb") as f:
+                out.write(f.read())
+            with open(config, "rb") as f:
+                out.write(f.read())
+            with open(archive_7z, "rb") as f:
+                out.write(f.read())
+        os.remove(archive_7z)
+        os.remove(config)
+        size_mb = os.path.getsize(sfx_exe) / (1024 * 1024)
+        print(f"  {sfx_exe} ({size_mb:.0f} MB)")
+    else:
+        print("  7-Zip not found — skipping SFX (install 7-Zip for single-click .exe)")
 
     step("Build complete")
     print(f"  Unpacked app: {unpacked}")
-    print(f"  Archive:      {archive}")
+    print(f"  Portable:     {sfx_exe}")
 
 
 if __name__ == "__main__":

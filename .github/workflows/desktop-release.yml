@@ -59,14 +59,31 @@ jobs:
         working-directory: desktop
         run: npx electron-builder --dir --win
 
-      - name: Archive for distribution
+      - name: Copy PyInstaller _internal into electron output
         run: |
-          $root = "${{ github.workspace }}"
-          Compress-Archive -Path "$root\desktop\output\win-unpacked\*" -DestinationPath "$root\desktop\output\AVScraper-portable.zip"
+          $src = "${{ github.workspace }}\desktop\python-dist\avscraper-backend\_internal"
+          $dst = "${{ github.workspace }}\desktop\output\win-unpacked\resources\python-dist\avscraper-backend\_internal"
+          Copy-Item -Recurse $src $dst
+
+      - name: Build self-extracting archive (SFX)
+        run: |
+          $root = "${{ github.workspace }}\desktop\output"
+          cd $root
+          $config = @"
+          ^;!@Install@!UTF-8!
+          Title="AV Scraper"
+          RunProgram="AV Scraper.exe"
+          ^;!@InstallEnd@!
+          "@
+          [System.IO.File]::WriteAllText("$root\sfx-config.txt", $config)
+          & "C:\Program Files\7-Zip\7z.exe" a -mx5 avscraper.7z ".\win-unpacked\*"
+          $sfx = "$root\AVScraper-Portable.exe"
+          cmd /c "copy /b `"C:\Program Files\7-Zip\7z.sfx`" + sfx-config.txt + avscraper.7z `"$sfx`""
+          Remove-Item "$root\avscraper.7z", "$root\sfx-config.txt"
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: desktop/output/AVScraper-portable.zip
+          files: desktop/output/AVScraper-Portable.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

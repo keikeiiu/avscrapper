@@ -1,6 +1,6 @@
 {
   "name": "avscraper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AV Scraper Desktop — FC2/JAV metadata scraper with web GUI",
   "main": "main.js",
   "author": "keikeiiu",
