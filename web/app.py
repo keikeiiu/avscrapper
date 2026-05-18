@@ -6,12 +6,27 @@ import time
 import shutil
 from collections import deque
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+# PyInstaller: sys._MEIPASS points to the _internal bundle directory
+_frozen = getattr(sys, 'frozen', False)
+if _frozen:
+    ROOT = sys._MEIPASS
+    HERE = ROOT
+    # Desktop: point Playwright at bundled Chromium in _internal/ms-playwright/
+    _pw_browsers = os.path.join(ROOT, "ms-playwright")
+    if os.path.isdir(_pw_browsers):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_browsers
+else:
+    HERE = os.path.dirname(os.path.abspath(__file__))
+    ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-# Resolve config.yaml path (respects AV_CONFIG for Docker)
+_is_desktop = os.environ.get("AV_DESKTOP") == "1"
+
+# Resolve config.yaml path (respects AV_CONFIG for Docker / AV_APPDATA for Desktop)
 _config_default = os.path.join(ROOT, "config.yaml")
+if _is_desktop:
+    _appdata = os.environ.get("AV_APPDATA", os.path.join(ROOT, "appdata"))
+    _config_default = os.path.join(_appdata, "config.yaml")
 config_yaml = os.environ.get("AV_CONFIG", _config_default)
 # Ensure config.yaml exists on first run
 if not os.path.isfile(config_yaml):
@@ -19,11 +34,22 @@ if not os.path.isfile(config_yaml):
     if os.path.exists(example):
         os.makedirs(os.path.dirname(config_yaml), exist_ok=True)
         shutil.copy(example, config_yaml)
-        # Docker: rewrite paths to absolute (relative breaks when config is in subdirectory)
-        if config_yaml.startswith("/app/"):
-            import yaml as _yaml
-            with open(config_yaml, encoding="utf-8") as f:
-                cfg = _yaml.safe_load(f)
+        import yaml as _yaml
+        with open(config_yaml, encoding="utf-8") as f:
+            cfg = _yaml.safe_load(f)
+        if _is_desktop:
+            # Desktop: write paths into the user's appdata directory
+            cfg["db_path"] = os.path.join(_appdata, "av_data.db").replace("\\", "/")
+            cfg["report_dir"] = os.path.join(_appdata, "reports").replace("\\", "/")
+            ing = cfg.setdefault("ingest", {})
+            downloads = os.path.join(os.path.expanduser("~"), "Downloads")
+            ing["source"] = os.path.join(downloads, "new fc2").replace("\\", "/")
+            ing["fc2_target"] = os.path.join(downloads, "processed_").replace("\\", "/")
+            ing["jav_target"] = os.path.join(downloads, "processed_").replace("\\", "/")
+            cfg.setdefault("reorganize", {})["target"] = os.path.join(downloads, "reorganized_").replace("\\", "/")
+            os.makedirs(cfg["report_dir"], exist_ok=True)
+        elif config_yaml.startswith("/app/"):
+            # Docker: rewrite paths to absolute (relative breaks when config is in subdirectory)
             cfg["db_path"] = "/app/appdata/av_data.db"
             cfg["report_dir"] = "/app/appdata/reports"
             ing = cfg.setdefault("ingest", {})
@@ -31,14 +57,14 @@ if not os.path.isfile(config_yaml):
             ing["fc2_target"] = "/app/processed"
             ing["jav_target"] = "/app/processed"
             cfg.setdefault("reorganize", {})["target"] = "/app/reorganized"
-            with open(config_yaml, "w", encoding="utf-8") as f:
-                _yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
             os.makedirs("/app/appdata/reports", exist_ok=True)
+        with open(config_yaml, "w", encoding="utf-8") as f:
+            _yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
 
 from flask import Flask, render_template, jsonify
 import yaml
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(ROOT, "web", "templates"), static_folder=os.path.join(ROOT, "web", "static"))
 
 # In-memory action history (last 10 entries, lost on restart)
 action_history = deque(maxlen=10)
@@ -150,4 +176,6 @@ def inject_config():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 3721)), debug=True, threaded=True)
+    port = int(os.environ.get("FLASK_PORT", os.environ.get("PORT", 3721)))
+    debug = os.environ.get("AV_DESKTOP") != "1"
+    app.run(host="127.0.0.1", port=port, debug=debug, threaded=True)

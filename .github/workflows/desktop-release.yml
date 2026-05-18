@@ -1,0 +1,67 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt pyinstaller pillow
+
+      - name: Install Playwright Chromium
+        run: |
+          playwright install --with-deps chromium
+          echo "PLAYWRIGHT_BROWSERS_PATH=$env:USERPROFILE\AppData\Local\ms-playwright" >> $env:GITHUB_ENV
+
+      - name: Install npm deps
+        working-directory: desktop
+        run: npm install
+
+      - name: PyInstaller — freeze backend
+        run: |
+          python -m PyInstaller --onedir --name avscraper-backend `
+            --distpath desktop\python-dist `
+            --workpath desktop\pyinstaller-work `
+            --specpath desktop `
+            --hidden-import flask --hidden-import markdown --hidden-import yaml `
+            --hidden-import defusedxml --hidden-import playwright `
+            --hidden-import web.process_manager `
+            --add-data "web\templates;web\templates" `
+            --add-data "web\static;web\static" `
+            --add-data "web\routes;web\routes" `
+            --add-data "src;src" `
+            --add-data "config.example.yaml;." `
+            web\app.py
+          # Bundle Playwright Chromium
+          $browsers = "$env:USERPROFILE\AppData\Local\ms-playwright"
+          if (Test-Path $browsers) {
+            Copy-Item -Recurse $browsers desktop\python-dist\avscraper-backend\_internal\ms-playwright
+          }
+
+      - name: Electron-builder — package portable
+        working-directory: desktop
+        run: npx electron-builder --win portable
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/output/AVScraper-*-portable.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

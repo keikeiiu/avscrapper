@@ -11,3 +11,10 @@ appdata/
 config.yaml.bak
 F-drive-FC2-list.md
 .claude/
+
+# Desktop app build artifacts
+desktop/node_modules/
+desktop/output/
+desktop/python-dist/
+desktop/pyinstaller-work/
+desktop/*.spec

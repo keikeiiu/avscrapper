@@ -1,0 +1,41 @@
+{
+  "name": "avscraper",
+  "version": "1.0.0",
+  "description": "AV Scraper Desktop — FC2/JAV metadata scraper with web GUI",
+  "main": "main.js",
+  "author": "keikeiiu",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.keikeiiu.avscraper",
+    "productName": "AV Scraper",
+    "directories": {
+      "output": "output"
+    },
+    "extraResources": [
+      {
+        "from": "python-dist",
+        "to": "python-dist"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "icons/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "icons/icon.png",
+      "category": "public.app-category.utilities"
+    },
+    "portable": {
+      "artifactName": "AVScraper-${version}-portable.exe"
+    }
+  }
+}
