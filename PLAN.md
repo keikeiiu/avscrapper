@@ -61,23 +61,13 @@ avscrapper/
 |-----------|--------|
 | FC2 scraper + NFO + enricher | ✅ |
 | JavDB scraper + NFO + enricher | ✅ |
-| Ingest (auto-detect FC2/JAV, part assignment) | ✅ |
-| Reorganizer (templates, studio/series maps, copy-verify-delete) | ✅ |
-| Duration audit (ffprobe, two-tier flagging) | ✅ |
-| Web GUI (dashboard, actions, DB browser, logs, config editor, SSE) | ✅ |
-| Docker image + Compose (4 mounts, first-run auto-config) | ✅ |
-| GitHub Actions CI (Docker publish + Desktop release + Python audit) | ✅ |
-| Desktop app (Electron + PyInstaller + SFX, portable .exe) | ✅ |
-| Desktop build audit (no personal data leaks, clean distributable) | ✅ |
-| Security (defusedxml, Bandit/pip-audit, SQL nosec) | ✅ |
-| Path resolution (AV_CONFIG env var, config-dir relative, absolute fallback) | ✅ |
-| NFO-first import (skip web scrape if NFO exists in video folder) | ✅ |
-| Cross-filesystem moves (shutil.move fallback, copytree+rmtree) | ✅ |
-| Auto-part assignment (multiple videos share CID, no explicit markers) | ✅ |
-| Config editor (CodeMirror YAML, validation, backup) | ✅ |
-| Standalone repo extraction (subtree split, full history) | ✅ |
-| `{title:N}`, `{series:N}`, `{code}` template vars | ✅ |
-| Studio/series maps (40+ JAV) | ✅ |
+| Ingest pipeline (auto-detect, part assignment, seed DB) | ✅ |
+| Reorganizer (folder templates, studio/series maps) | ✅ |
+| Duration audit (ffprobe, two-tier flags) | ✅ |
+| Web GUI (dashboard, config editor, DB browser, SSE) | ✅ |
+| Docker (image + Compose, first-run auto-config) | ✅ |
+| Desktop app (Electron + PyInstaller + SFX portable .exe) | ✅ |
+| CI/CD (Docker publish, desktop release, Python audit) | ✅ |
 
 ## Database
 
