@@ -58,7 +58,7 @@ if not os.path.isfile(config_yaml):
         with open(config_yaml, "w", encoding="utf-8") as f:
             _yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, send_file
 import yaml
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "web", "templates"), static_folder=os.path.join(ROOT, "web", "static"))
@@ -152,6 +152,31 @@ def config_page():
 @app.route("/pipeline")
 def pipeline_page():
     return render_template("pipeline.html")
+
+
+@app.route("/api/cover")
+def api_cover():
+    """Serve cached cover image, fall back to redirecting to remote URL."""
+    cid = request.args.get("cid", "")
+    if not cid:
+        return ("Missing cid", 400)
+    from src.db import connect
+    conn = connect(config["db_path"])
+    row = conn.execute(
+        "SELECT cover_path, cover_url FROM fc2_entries WHERE cid=? UNION ALL SELECT cover_path, cover_url FROM jav_entries WHERE cid=? LIMIT 1",
+        (cid, cid)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return ("Not found", 404)
+    local_path, remote_url = row["cover_path"], row["cover_url"]
+    if local_path and os.path.isfile(local_path):
+        import mimetypes
+        mime, _ = mimetypes.guess_type(local_path)
+        return send_file(local_path, mimetype=mime or "image/jpeg")
+    if remote_url:
+        return redirect(remote_url, code=302)
+    return ("No cover available", 404)
 
 
 @app.route("/api/open-file")

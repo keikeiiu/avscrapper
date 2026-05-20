@@ -108,7 +108,7 @@ def init_db(db_path):
     """)
     # Migrate existing databases
     for table in ("fc2_entries", "jav_entries"):
-        for col in ("audit_status", "last_audited", "region"):
+        for col in ("audit_status", "last_audited", "region", "cover_path"):
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
             except sqlite3.OperationalError:
@@ -173,10 +173,8 @@ def upsert_scraped(conn, cid, data, source):
         data.get("mosaic"),
         json.dumps(data, ensure_ascii=False),
     ))
+    _cache_cover(conn, "fc2_entries", cid, data.get("cover_url"))
     conn.commit()
-
-
-def mark_status(conn, cid, status, error_message=None):
     """Update status and optional error message for a CID."""
     conn.execute("""
         UPDATE fc2_entries SET status=?, error_message=?, scraped_at=datetime('now')
@@ -353,6 +351,7 @@ def upsert_scraped_jav(conn, cid, data, source):
         source,
         json.dumps(data, ensure_ascii=False),
     ))
+    _cache_cover(conn, "jav_entries", cid, data.get("cover_url"))
     conn.commit()
 
 
@@ -404,6 +403,55 @@ def get_files_with_paths(conn, table):
         f"SELECT * FROM {table} WHERE file_path IS NOT NULL AND file_path != ''"
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def set_cover_path(conn, table, cid, cover_path):
+    """Update cover_path for an entry."""
+    conn.execute(
+        f"UPDATE {table} SET cover_path=? WHERE cid=?",
+        (cover_path, cid)
+    )
+    conn.commit()
+
+
+def _cache_cover(conn, table, cid, cover_url):
+    """Download and cache cover image after upsert. Non-blocking — errors are silent."""
+    if not cover_url:
+        return
+    try:
+        db_dir = os.path.dirname(conn.execute("PRAGMA database_list").fetchone()[2] or ".")
+        covers_dir = os.path.join(db_dir, "covers")
+        local_path = download_cover(cid, cover_url, covers_dir)
+        if local_path:
+            set_cover_path(conn, table, cid, local_path)
+    except Exception:
+        pass
+
+
+def download_cover(cid, cover_url, covers_dir):
+    """Download cover image to local cache. Returns local path or None."""
+    import os
+    import urllib.request
+    os.makedirs(covers_dir, exist_ok=True)
+    ext = ".jpg"
+    if cover_url:
+        parsed = cover_url.split("?")[0]
+        _, e = os.path.splitext(parsed)
+        if e in (".png", ".webp", ".gif"):
+            ext = e
+    path = os.path.join(covers_dir, f"{cid}{ext}")
+    if os.path.exists(path):
+        return path
+    try:
+        req = urllib.request.Request(cover_url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            with open(path, "wb") as f:
+                f.write(resp.read())
+        return path
+    except Exception:
+        return None
 
 
 def get_stale_files(conn, table):
