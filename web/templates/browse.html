@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="browse-header">
+  <div class="tabs" id="browse-tabs">
+    <button class="tab-btn active" onclick="selectBrowseType('fc2')" data-type="fc2">FC2</button>
+    <button class="tab-btn" onclick="selectBrowseType('jav')" data-type="jav">JAV</button>
+  </div>
+  <div class="browse-search-wrap">
+    <input type="text" id="browse-search" placeholder="Search by title, CID, actress, studio, genre, series, director..." autocomplete="off">
+  </div>
+</div>
+
+<div class="browse-toolbar">
+  <select id="browse-status" onchange="onBrowseFilterChange('status', this.value)">
+    <option value="">All Statuses</option>
+  </select>
+  <select id="browse-studio" onchange="onBrowseFilterChange('studio', this.value)" style="display:none">
+    <option value="">All Studios</option>
+  </select>
+  <select id="browse-series" onchange="onBrowseFilterChange('series', this.value)" style="display:none">
+    <option value="">All Series</option>
+  </select>
+  <select id="browse-director" onchange="onBrowseFilterChange('director', this.value)" style="display:none">
+    <option value="">All Directors</option>
+  </select>
+  <select id="browse-seller" onchange="onBrowseFilterChange('seller', this.value)" style="display:none">
+    <option value="">All Sellers</option>
+  </select>
+  <select id="browse-actress" onchange="onBrowseFilterChange('actress', this.value)" style="display:none">
+    <option value="">All Actresses</option>
+  </select>
+  <select id="browse-sort" onchange="onBrowseSortChange()">
+    <option value="scraped_at">Recently Scraped</option>
+    <option value="release_date">Release Date</option>
+    <option value="title">Title</option>
+    <option value="rating">Rating</option>
+    <option value="file_count">File Count</option>
+  </select>
+  <button class="btn sm" id="browse-sort-dir" onclick="toggleSortDir()" title="Toggle sort direction">↓</button>
+  <div class="filter-chips" id="filter-chips"></div>
+</div>
+
+<div id="browse-grid" class="poster-grid"></div>
+<div id="browse-empty" class="browse-empty" style="display:none">No entries found. Try adjusting your search or filters.</div>
+<div class="pagination" id="browse-pagination" style="display:none"></div>
+
+<!-- Detail Modal -->
+<div id="browse-modal" class="browse-modal" style="display:none">
+  <div class="modal-backdrop" onclick="closeBrowseDetail()"></div>
+  <div class="modal-content" id="browse-modal-content"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  initBrowse();
+});
+</script>
+{% endblock %}

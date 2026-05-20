@@ -13,6 +13,7 @@
       <a href="{{ url_for('index') }}" {% if request.path == '/' %}class="active"{% endif %}>Dashboard</a>
       <a href="{{ url_for('actions_page') }}" {% if request.path == '/actions' %}class="active"{% endif %}>Actions</a>
       <a href="{{ url_for('db_page') }}" {% if request.path == '/db' %}class="active"{% endif %}>Database<span id="nav-pending-badge" style="display:none" class="nav-badge"></span></a>
+      <a href="{{ url_for('browse_page') }}" {% if request.path == '/browse' %}class="active"{% endif %}>Browse</a>
       <a href="{{ url_for('logs_page') }}" {% if request.path == '/logs' %}class="active"{% endif %}>Logs</a>
       <a href="{{ url_for('config_page') }}" {% if request.path == '/config' %}class="active"{% endif %}>Config</a>
       <a href="{{ url_for('pipeline_page') }}" {% if request.path == '/pipeline' %}class="active"{% endif %}>Pipeline</a>

@@ -122,7 +122,7 @@ def clean_filename(info):
 
 
 def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False, confirm=False, report_dir=None):
-    from db import connect, init_db, insert_pending, insert_pending_jav
+    from db import connect, init_db, insert_pending, insert_pending_jav, upsert_file, upsert_file_jav
 
     if not os.path.isdir(source):
         print(f"Source directory not found: {source}")
@@ -285,12 +285,15 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         shutil.move(src_path, dest_path)
 
         full_number = f"FC2-PPV-{r['cid']}" if r["type"] == "fc2" else r["cid"]
+        file_size = os.path.getsize(dest_path) if os.path.exists(dest_path) else None
         if r["type"] == "fc2":
             insert_pending(conn, r["cid"], full_number, "fc2ppvdb",
                           f"https://fc2ppvdb.com/articles/{r['cid']}")
+            upsert_file(conn, r["cid"], dest_dir, dest_path, file_size, r["part"])
         else:
             insert_pending_jav(conn, r["cid"], full_number, "javdb",
                              f"https://javdb.com/search?q={r['cid']}&f=all")
+            upsert_file_jav(conn, r["cid"], dest_dir, dest_path, file_size, r["part"])
         moved += 1
 
     conn.close()

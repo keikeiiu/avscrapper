@@ -143,6 +143,194 @@ def api_row(table, cid):
         return jsonify({"error": str(e)}), 500
 
 
+# ── Browse grid endpoints ────────────────────────────────────────────
+
+_BROWSE_SORT_MAP = {
+    "scraped_at": "e.scraped_at",
+    "title": "e.title",
+    "release_date": "e.release_date",
+    "rating": "e.rating",
+    "file_count": "file_count",
+}
+
+_FC2_SEARCH_COLS = ["e.cid", "e.full_number", "e.title", "e.seller", "e.actress", "e.tags"]
+_JAV_SEARCH_COLS = ["e.cid", "e.full_number", "e.title", "e.studio", "e.label", "e.series", "e.director", "e.genres", "e.actors"]
+
+
+@db_bp.route("/api/db/browse")
+def api_browse():
+    entry_type = request.args.get("type", "").lower()
+    if entry_type not in ("fc2", "jav"):
+        return jsonify({"error": "type must be fc2 or jav"}), 400
+
+    entries_table = f"{entry_type}_entries"
+    files_table = f"{entry_type}_files"
+    search = request.args.get("search", "").strip()
+    status = request.args.get("status", "").strip()
+    studio = request.args.get("studio", "").strip()
+    series = request.args.get("series", "").strip()
+    seller = request.args.get("seller", "").strip()
+    actress = request.args.get("actress", "").strip()
+    director = request.args.get("director", "").strip()
+    genre = request.args.get("genre", "").strip()
+    tag = request.args.get("tag", "").strip()
+    sort = request.args.get("sort", "scraped_at")
+    order = request.args.get("order", "desc")
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = min(200, max(6, int(request.args.get("per_page", 48))))
+
+    sort_col = _BROWSE_SORT_MAP.get(sort, "e.scraped_at")
+    if sort_col == "e.rating" and entry_type == "fc2":
+        sort_col = "e.scraped_at"
+    if order not in ("asc", "desc"):
+        order = "desc"
+
+    conn = connect(_db_path())
+
+    where = []
+    params = []
+
+    if search:
+        cols = _FC2_SEARCH_COLS if entry_type == "fc2" else _JAV_SEARCH_COLS
+        clauses = [f"{c} LIKE ?" for c in cols]
+        where.append("(" + " OR ".join(clauses) + ")")
+        params.extend([f"%{search}%"] * len(cols))
+
+    if status:
+        where.append("e.status = ?")
+        params.append(status)
+    if entry_type == "jav":
+        if studio:
+            where.append("e.studio = ?")
+            params.append(studio)
+        if series:
+            where.append("e.series = ?")
+            params.append(series)
+        if director:
+            where.append("e.director = ?")
+            params.append(director)
+        if genre:
+            where.append("e.genres LIKE ?")
+            params.append(f"%{genre}%")
+    else:
+        if seller:
+            where.append("e.seller = ?")
+            params.append(seller)
+        if actress:
+            where.append("e.actress LIKE ?")
+            params.append(f"%{actress}%")
+        if tag:
+            where.append("e.tags LIKE ?")
+            params.append(f"%{tag}%")
+
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+
+    try:
+        total_row = conn.execute(
+            f"SELECT COUNT(*) FROM {entries_table} e{clause}", params
+        ).fetchone()
+        total = total_row[0] if total_row else 0
+        pages = max(1, math.ceil(total / per_page))
+        page = min(page, pages)
+        offset = (page - 1) * per_page
+
+        order_dir = "DESC" if order == "desc" else "ASC"
+        # Build a select that joins file aggregates
+        sql = f"""
+            SELECT e.*,
+                   COALESCE(f.file_count, 0) AS file_count,
+                   COALESCE(f.total_size, 0) AS total_size,
+                   f.duration_str
+            FROM {entries_table} e
+            LEFT JOIN (
+                SELECT cid,
+                       COUNT(*) AS file_count,
+                       SUM(file_size) AS total_size,
+                       MAX(duration_str) AS duration_str
+                FROM {files_table}
+                GROUP BY cid
+            ) f ON e.cid = f.cid
+            {clause}
+            ORDER BY {sort_col} {order_dir} NULLS LAST
+            LIMIT ? OFFSET ?
+        """
+        rows = conn.execute(sql, params + [per_page, offset]).fetchall()
+        conn.close()
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            for col in ["tags", "genres", "actors", "fanart_urls"]:
+                if col in d and isinstance(d[col], str):
+                    try:
+                        d[col] = json.loads(d[col])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+            results.append(d)
+
+        return jsonify({
+            "rows": results,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": pages,
+            "sort": sort,
+            "order": order,
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+
+
+@db_bp.route("/api/db/facets/<entry_type>")
+def api_facets(entry_type):
+    if entry_type not in ("fc2", "jav"):
+        return jsonify({"error": "type must be fc2 or jav"}), 400
+
+    entries_table = f"{entry_type}_entries"
+    conn = connect(_db_path())
+
+    try:
+        # Status counts
+        status_rows = conn.execute(
+            f"SELECT status, COUNT(*) AS n FROM {entries_table} GROUP BY status ORDER BY n DESC"
+        ).fetchall()
+        statuses = {r["status"] or "null": r["n"] for r in status_rows}
+
+        filters = []
+
+        if entry_type == "fc2":
+            for field, label in [("seller", "Seller"), ("actress", "Actress")]:
+                vals = conn.execute(
+                    f"SELECT {field} AS value, COUNT(*) AS n FROM {entries_table}"
+                    f" WHERE {field} IS NOT NULL AND {field} != ''"
+                    f" GROUP BY {field} ORDER BY n DESC LIMIT 50"
+                ).fetchall()
+                filters.append({
+                    "field": field,
+                    "label": label,
+                    "values": [{"value": r["value"], "count": r["n"]} for r in vals],
+                })
+        else:
+            for field, label in [("studio", "Studio"), ("series", "Series"), ("director", "Director")]:
+                vals = conn.execute(
+                    f"SELECT {field} AS value, COUNT(*) AS n FROM {entries_table}"
+                    f" WHERE {field} IS NOT NULL AND {field} != ''"
+                    f" GROUP BY {field} ORDER BY n DESC LIMIT 50"
+                ).fetchall()
+                filters.append({
+                    "field": field,
+                    "label": label,
+                    "values": [{"value": r["value"], "count": r["n"]} for r in vals],
+                })
+
+        conn.close()
+        return jsonify({"type": entry_type, "statuses": statuses, "filters": filters})
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+
+
 @db_bp.route("/api/db/summary")
 def api_summary():
     conn = connect(_db_path())

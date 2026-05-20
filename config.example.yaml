@@ -4,6 +4,11 @@
 db_path: "./appdata/av_data.db"
 report_dir: "./appdata/reports"
 
+# Docker: host mount base for translating container paths to host-accessible paths.
+# Example: if your docker-compose mounts /app/downloads ← /mnt/media/JAV
+# set host_mount_base: "/mnt/media/JAV"
+# host_mount_base: ""
+
 # Ingest — where downloads arrive and where organized files go
 ingest:
   source: "./downloads"
@@ -66,6 +71,24 @@ reorganize:
     鉄板: TEPPAN
     VENUS: VENUS
     ヴィーナス: VENUS
+    # Chinese studios
+    麻豆傳媒映畫: 麻豆傳媒
+    麻豆传媒映画: 麻豆傳媒
+    大象传媒: 大象传媒
+    精东影业: 精东影业
+    天美传媒: 天美传媒
+    星空无限传媒: 星空无限传媒
+    蜜桃影像: 蜜桃影像
+    糖心Vlog: 糖心Vlog
+    皇家华人: 皇家华人
+    果冻传媒: 果冻传媒
+    扣扣传媒: 扣扣传媒
+    爱豆传媒: 爱豆传媒
+    兔子先生: 兔子先生
+    SWAG: SWAG
+    91制片厂: 91制片厂
+    NHAV: NHAV
+    EDEA: EDEA
     # Fitch / Aroma / others
     Fitch: Fitch
     花子: Hanako

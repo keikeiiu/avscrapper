@@ -58,7 +58,7 @@ if not os.path.isfile(config_yaml):
         with open(config_yaml, "w", encoding="utf-8") as f:
             _yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import yaml
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "web", "templates"), static_folder=os.path.join(ROOT, "web", "static"))
@@ -126,6 +126,11 @@ def db_page():
     return render_template("db_browse.html")
 
 
+@app.route("/browse")
+def browse_page():
+    return render_template("browse.html")
+
+
 @app.route("/logs")
 def logs_page():
     reports_dir = config.get("report_dir", os.path.join(ROOT, "reports"))
@@ -147,6 +152,39 @@ def config_page():
 @app.route("/pipeline")
 def pipeline_page():
     return render_template("pipeline.html")
+
+
+@app.route("/api/open-file")
+def api_open_file():
+    import subprocess
+    path = request.args.get("path", "").replace("\\", "/")
+    if not path:
+        return jsonify({"error": "No path provided"}), 400
+
+    # Docker: translate container path → host path via configured mount base
+    host_mount = (config or {}).get("host_mount_base", "")
+    if host_mount and path.startswith("/app/"):
+        rel = path[len("/app/"):]
+        path = os.path.normpath(os.path.join(host_mount, rel)).replace("\\", "/")
+
+    if not os.path.exists(path):
+        return jsonify({"error": "File not found", "path": path}), 404
+
+    try:
+        if sys.platform == "win32":
+            os.startfile(os.path.normpath(path))
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            # headless Linux (Docker) — xdg-open has no display
+            display = os.environ.get("DISPLAY")
+            if display:
+                subprocess.Popen(["xdg-open", path])
+            else:
+                return jsonify({"status": "path_only", "path": path})
+        return jsonify({"status": "opened", "path": path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/report/<name>")

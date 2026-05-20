@@ -112,7 +112,13 @@ def init_db(db_path):
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
             except sqlite3.OperationalError:
-                pass  # column already exists
+                pass
+    for table in ("fc2_files", "jav_files"):
+        for col in ("path_status",):
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass
     conn.commit()
     conn.close()
 
@@ -348,6 +354,64 @@ def upsert_scraped_jav(conn, cid, data, source):
         json.dumps(data, ensure_ascii=False),
     ))
     conn.commit()
+
+
+def upsert_file(conn, cid, directory_path, file_path, file_size=None, part_number=1):
+    """Insert or update an FC2 file record keyed by (cid, file_path)."""
+    existing = conn.execute(
+        "SELECT id FROM fc2_files WHERE cid=? AND file_path=?", (cid, file_path)
+    ).fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE fc2_files SET directory_path=?, file_size=?, part_number=?, path_status='ok' WHERE id=?",
+            (directory_path, file_size, part_number, existing["id"])
+        )
+    else:
+        conn.execute(
+            "INSERT INTO fc2_files (cid, directory_path, file_path, file_size, part_number, path_status) VALUES (?,?,?,?,?,'ok')",
+            (cid, directory_path, file_path, file_size, part_number)
+        )
+    conn.commit()
+
+
+def upsert_file_jav(conn, cid, directory_path, file_path, file_size=None, part_number=1):
+    """Insert or update a JAV file record keyed by (cid, file_path)."""
+    existing = conn.execute(
+        "SELECT id FROM jav_files WHERE cid=? AND file_path=?", (cid, file_path)
+    ).fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE jav_files SET directory_path=?, file_size=?, part_number=?, path_status='ok' WHERE id=?",
+            (directory_path, file_size, part_number, existing["id"])
+        )
+    else:
+        conn.execute(
+            "INSERT INTO jav_files (cid, directory_path, file_path, file_size, part_number, path_status) VALUES (?,?,?,?,?,'ok')",
+            (cid, directory_path, file_path, file_size, part_number)
+        )
+    conn.commit()
+
+
+def mark_path_status(conn, table, file_id, status):
+    """Update path_status for a file record (ok / stale / missing)."""
+    conn.execute(f"UPDATE {table} SET path_status=? WHERE id=?", (status, file_id))
+    conn.commit()
+
+
+def get_files_with_paths(conn, table):
+    """Return file records that have a non-null file_path."""
+    rows = conn.execute(
+        f"SELECT * FROM {table} WHERE file_path IS NOT NULL AND file_path != ''"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_stale_files(conn, table):
+    """Return file records with path_status='stale'."""
+    rows = conn.execute(
+        f"SELECT * FROM {table} WHERE path_status='stale'"
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def mark_status_jav(conn, cid, status, error_message=None):

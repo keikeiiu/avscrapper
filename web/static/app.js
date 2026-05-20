@@ -507,7 +507,385 @@ function resetPipeBtn() {
   document.getElementById('pipe-spinner').style.display = 'none';
 }
 
-// ── Helpers ────────────────────────
+// ── Browse Grid ─────────────────────
+let browseState = {
+  type: 'fc2',
+  search: '',
+  filters: {},
+  sort: 'scraped_at',
+  order: 'desc',
+  page: 1,
+  perPage: 48,
+  total: 0,
+  pages: 1,
+  debounceTimer: null
+};
+
+function initBrowse() {
+  if (!document.getElementById('browse-grid')) return;
+  document.getElementById('browse-search').addEventListener('input', onBrowseSearch);
+  document.getElementById('browse-sort-dir').textContent = browseState.order === 'desc' ? '↓' : '↑';
+  loadFacets(browseState.type);
+  loadBrowseGrid();
+}
+
+function selectBrowseType(type) {
+  browseState.type = type;
+  browseState.filters = {};
+  browseState.page = 1;
+  browseState.sort = 'scraped_at';
+  browseState.order = 'desc';
+  document.getElementById('browse-sort').value = 'scraped_at';
+  document.getElementById('browse-sort-dir').textContent = '↓';
+  document.getElementById('browse-search').value = '';
+  document.querySelectorAll('#browse-tabs .tab-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+  loadFacets(type);
+  loadBrowseGrid();
+}
+
+function loadFacets(type) {
+  fetch('/api/db/facets/' + type)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) return;
+
+      // Status dropdown
+      var sel = document.getElementById('browse-status');
+      sel.innerHTML = '<option value="">All Statuses</option>';
+      for (var s in data.statuses) {
+        if (s === 'null') continue;
+        sel.innerHTML += '<option value="' + escAttr(s) + '">' + esc(s) + ' (' + data.statuses[s] + ')</option>';
+      }
+
+      // Show/hide type-specific filters
+      var isJav = type === 'jav';
+      document.getElementById('browse-studio').style.display = isJav ? '' : 'none';
+      document.getElementById('browse-series').style.display = isJav ? '' : 'none';
+      document.getElementById('browse-director').style.display = isJav ? '' : 'none';
+      document.getElementById('browse-seller').style.display = isJav ? 'none' : '';
+      document.getElementById('browse-actress').style.display = isJav ? 'none' : '';
+
+      for (var i = 0; i < data.filters.length; i++) {
+        var f = data.filters[i];
+        var filterSel = document.getElementById('browse-' + f.field);
+        if (!filterSel) continue;
+        filterSel.innerHTML = '<option value="">All ' + f.label + 's</option>';
+        for (var j = 0; j < f.values.length; j++) {
+          filterSel.innerHTML += '<option value="' + escAttr(f.values[j].value) + '">' + esc(f.values[j].value) + ' (' + f.values[j].count + ')</option>';
+        }
+      }
+    })
+    .catch(function(e) { console.error('loadFacets error:', e); });
+}
+
+function loadBrowseGrid() {
+  var url = '/api/db/browse?type=' + browseState.type +
+    '&page=' + browseState.page +
+    '&per_page=' + browseState.perPage +
+    '&sort=' + browseState.sort +
+    '&order=' + browseState.order;
+  if (browseState.search) url += '&search=' + encodeURIComponent(browseState.search);
+  for (var key in browseState.filters) {
+    if (browseState.filters[key]) url += '&' + key + '=' + encodeURIComponent(browseState.filters[key]);
+  }
+
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        document.getElementById('browse-empty').style.display = '';
+        document.getElementById('browse-grid').innerHTML = '';
+        document.getElementById('browse-pagination').style.display = 'none';
+        return;
+      }
+
+      browseState.total = data.total;
+      browseState.pages = data.pages;
+      browseState.page = data.page;
+
+      if (!data.rows || !data.rows.length) {
+        document.getElementById('browse-grid').innerHTML = '';
+        document.getElementById('browse-empty').style.display = '';
+        document.getElementById('browse-pagination').style.display = 'none';
+      } else {
+        document.getElementById('browse-empty').style.display = 'none';
+        renderBrowseGrid(data);
+        renderBrowsePagination();
+      }
+    })
+    .catch(function(e) {
+      console.error('loadBrowseGrid error:', e);
+    });
+}
+
+function renderBrowseGrid(data) {
+  var html = '';
+  for (var i = 0; i < data.rows.length; i++) {
+    html += renderPosterCard(data.rows[i], browseState.type);
+  }
+  document.getElementById('browse-grid').innerHTML = html;
+}
+
+function renderPosterCard(row, type) {
+  var coverHtml;
+  if (row.cover_url) {
+    coverHtml = '<img src="' + escAttr(row.cover_url) + '" loading="lazy" referrerpolicy="no-referrer"' +
+      ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+      '<div class="no-cover" style="display:none"><span>' + esc(row.cid || '') + '</span><span style="font-size:11px">No cover</span></div>';
+  } else {
+    coverHtml = '<div class="no-cover"><span>' + esc(row.cid || '') + '</span><span style="font-size:11px">No cover</span></div>';
+  }
+
+  var statusHtml = '';
+  if (row.status && row.status !== 'scraped') {
+    statusHtml = '<span class="status-badge badge ' + statusColor(row.status) + '">' + esc(row.status) + '</span>';
+  }
+
+  var ratingHtml = '';
+  if (type === 'jav' && row.rating) {
+    ratingHtml = '<span class="rating">&#9733; ' + parseFloat(row.rating).toFixed(1) + '</span>';
+  }
+
+  var filesHtml = '';
+  if (row.file_count > 0) {
+    filesHtml = '<span>' + row.file_count + ' file' + (row.file_count !== 1 ? 's' : '') + '</span>';
+  }
+
+  var durationHtml = '';
+  if (row.duration_str) {
+    durationHtml = '<span>' + esc(row.duration_str) + '</span>';
+  } else if (row.duration) {
+    durationHtml = '<span>' + esc(row.duration) + '</span>';
+  }
+
+  return '<div class="poster-card" onclick="openBrowseDetail(\'' + escAttr(row.cid || '') + '\')">' +
+    '<div class="poster-cover">' + coverHtml + statusHtml + '</div>' +
+    '<div class="poster-info">' +
+      '<div class="card-title" title="' + escAttr(row.title || row.cid || '') + '">' + esc(row.title || row.cid || '') + '</div>' +
+      '<div class="card-cid">' + esc(row.cid || '') + '</div>' +
+      '<div class="card-meta">' + ratingHtml + filesHtml + durationHtml + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderBrowsePagination() {
+  var el = document.getElementById('browse-pagination');
+  var s = browseState;
+  var start = (s.page - 1) * s.perPage + 1;
+  var end = Math.min(s.page * s.perPage, s.total);
+  el.innerHTML =
+    '<span class="page-info">' + start + '-' + end + ' of ' + s.total + '</span>' +
+    '<button class="btn sm" onclick="goBrowsePage(' + (s.page - 1) + ')" ' + (s.page <= 1 ? 'disabled' : '') + '>← Prev</button>' +
+    '<span class="page-info">Page ' + s.page + ' of ' + s.pages + '</span>' +
+    '<button class="btn sm" onclick="goBrowsePage(' + (s.page + 1) + ')" ' + (s.page >= s.pages ? 'disabled' : '') + '>Next →</button>';
+  el.style.display = '';
+}
+
+function onBrowseSearch() {
+  clearTimeout(browseState.debounceTimer);
+  browseState.debounceTimer = setTimeout(function() {
+    browseState.search = document.getElementById('browse-search').value.trim();
+    browseState.page = 1;
+    loadBrowseGrid();
+  }, 300);
+}
+
+function onBrowseFilterChange(field, value) {
+  if (value) {
+    browseState.filters[field] = value;
+  } else {
+    delete browseState.filters[field];
+  }
+  browseState.page = 1;
+  renderActiveFilters();
+  loadBrowseGrid();
+}
+
+function removeBrowseFilter(field) {
+  delete browseState.filters[field];
+  var sel = document.getElementById('browse-' + field);
+  if (sel) sel.value = '';
+  browseState.page = 1;
+  renderActiveFilters();
+  loadBrowseGrid();
+}
+
+function renderActiveFilters() {
+  var html = '';
+  for (var key in browseState.filters) {
+    if (browseState.filters[key]) {
+      html += '<span class="filter-chip">' + esc(key) + ': ' + esc(browseState.filters[key]) +
+        '<span class="remove" onclick="removeBrowseFilter(\'' + escAttr(key) + '\')" title="Remove filter">&times;</span></span>';
+    }
+  }
+  document.getElementById('filter-chips').innerHTML = html;
+}
+
+function onBrowseSortChange() {
+  browseState.sort = document.getElementById('browse-sort').value;
+  browseState.page = 1;
+  loadBrowseGrid();
+}
+
+function toggleSortDir() {
+  browseState.order = browseState.order === 'desc' ? 'asc' : 'desc';
+  document.getElementById('browse-sort-dir').textContent = browseState.order === 'desc' ? '↓' : '↑';
+  browseState.page = 1;
+  loadBrowseGrid();
+}
+
+function goBrowsePage(p) {
+  if (p < 1 || p > browseState.pages) return;
+  browseState.page = p;
+  loadBrowseGrid();
+  document.getElementById('browse-grid').scrollIntoView({ behavior: 'smooth' });
+}
+
+function openBrowseDetail(cid) {
+  var table = browseState.type + '_entries';
+  fetch('/api/db/row/' + table + '/' + encodeURIComponent(cid))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { showToast('Failed to load details', 'error'); return; }
+
+      var coverHtml;
+      if (data.cover_url) {
+        coverHtml = '<img src="' + escAttr(data.cover_url) + '" class="modal-cover-img" referrerpolicy="no-referrer"' +
+          ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+          '<div class="modal-no-cover" style="display:none">' + esc(cid) + '</div>';
+      } else {
+        coverHtml = '<div class="modal-no-cover">' + esc(cid) + '</div>';
+      }
+
+      var statusHtml = '';
+      if (data.status) {
+        statusHtml = '<span class="status-badge badge ' + statusColor(data.status) + '">' + esc(data.status) + '</span>';
+      }
+
+      var dlHtml = '';
+      var fields = ['full_number', 'title', 'studio', 'label', 'series', 'director',
+                    'seller', 'actress', 'release_date', 'year', 'duration', 'runtime',
+                    'rating', 'votes', 'region', 'source', 'mosaic', 'audit_status',
+                    'scraped_at', 'last_audited', 'url', 'outline', 'plot', 'error_message'];
+      var dtFields = ['release_date', 'scraped_at', 'last_audited'];
+      for (var i = 0; i < fields.length; i++) {
+        var v = data[fields[i]];
+        if (v === null || v === undefined || v === '') continue;
+        if (Array.isArray(v)) {
+          v = v.map(function(x) { return typeof x === 'object' ? (x.name || JSON.stringify(x)) : x; }).join(', ');
+        }
+        var display = String(v);
+        if (fields[i] === 'region') {
+          display = display === 'chinese' ? 'Chinese' : (display === 'jav' ? 'Japanese' : display);
+        }
+        if (dtFields.indexOf(fields[i]) !== -1) {
+          display = fmtDate(v);
+        }
+        if (fields[i] === 'url' && /^https?:\/\//.test(v)) {
+          dlHtml += '<dt>' + fields[i] + '</dt><dd><a href="' + escAttr(String(v)) + '" target="_blank" rel="noopener">' + esc(display) + '</a></dd>';
+        } else {
+          dlHtml += '<dt>' + fields[i] + '</dt><dd>' + esc(display) + '</dd>';
+        }
+      }
+
+      // File listing
+      var filesHtml = '';
+      var fileTable = browseState.type + '_files';
+      if (data.file_count === undefined) {
+        // fetch files separately if not included in detail
+      }
+
+      var modalHtml =
+        '<button class="modal-close" onclick="closeBrowseDetail()">&times;</button>' +
+        '<div class="modal-layout">' +
+          coverHtml +
+          '<div class="modal-details">' +
+            '<h3>' + esc(data.title || data.cid || '') + '</h3>' +
+            '<div class="modal-cid">' + esc(data.cid || '') + '</div>' +
+            statusHtml +
+            '<dl>' + dlHtml + '</dl>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('browse-modal-content').innerHTML = modalHtml;
+      document.getElementById('browse-modal').style.display = '';
+      document.body.style.overflow = 'hidden';
+
+      // Fetch file listing in parallel
+      fetch('/api/db/table/' + fileTable + '?search=' + encodeURIComponent(cid) + '&per_page=50')
+        .then(function(r) { return r.json(); })
+        .then(function(fdata) {
+          if (fdata.rows && fdata.rows.length) {
+            var ftable = '<div class="modal-files"><h4>Files (' + fdata.rows.length + ')</h4><table><thead><tr><th>Path</th><th>File</th><th>Size</th><th>Duration</th></tr></thead><tbody>';
+            for (var fi = 0; fi < fdata.rows.length; fi++) {
+              var fr = fdata.rows[fi];
+              var fname = fr.file_path ? fr.file_path.split('/').pop().split('\\').pop() : '';
+              var dir = fr.directory_path || (fr.file_path ? fr.file_path.substring(0, fr.file_path.lastIndexOf('/') !== -1 ? fr.file_path.lastIndexOf('/') : fr.file_path.lastIndexOf('\\')) : '-');
+              var filePathEnc = escAttr(fr.file_path || '');
+              var dirPathEnc = escAttr(dir || '');
+              ftable += '<tr>' +
+                '<td style="max-width:240px">' + (dir && dir !== '-' ? '<a href="#" class="file-link" data-path="' + dirPathEnc + '" onclick="openFilePath(this.dataset.path);return false" title="Open folder">' + esc(trunc(dir, 50)) + '</a>' : '-') + '</td>' +
+                '<td>' + (fr.file_path ? '<a href="#" class="file-link" data-path="' + filePathEnc + '" onclick="openFilePath(this.dataset.path);return false" title="' + filePathEnc + '">' + esc(fname || fr.file_path || '-') + '</a>' : esc(fname || '-')) + '</td>' +
+                '<td>' + (fr.file_size ? formatSize(fr.file_size) : '-') + '</td>' +
+                '<td>' + (fr.duration_str || '-') + '</td></tr>';
+            }
+            ftable += '</tbody></table></div>';
+            document.querySelector('#browse-modal-content .modal-layout').insertAdjacentHTML('beforeend', ftable);
+          }
+        });
+    })
+    .catch(function(e) { console.error('openBrowseDetail error:', e); });
+}
+
+function closeBrowseDetail() {
+  document.getElementById('browse-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function openFilePath(path) {
+  fetch('/api/open-file?path=' + encodeURIComponent(path))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        showToast('Cannot open: ' + data.error, 'error');
+      } else if (data.status === 'path_only') {
+        // Docker/headless: no display, return the path for clipboard or manual use
+        showToast('Path (Docker): ' + data.path, 'success');
+      } else {
+        showToast('Opened: ' + (data.path || path).split('/').pop(), 'success');
+      }
+    })
+    .catch(function(e) { showToast('Failed to open file', 'error'); });
+}
+
+function statusColor(status) {
+  switch (status) {
+    case 'scraped': return 'green';
+    case 'pending': return 'muted';
+    case 'error': case 'login_required': return 'red';
+    case '404': return 'orange';
+    case 'flagged': return 'yellow';
+    default: return 'muted';
+  }
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '0 B';
+  var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  var i = 0;
+  var size = bytes;
+  while (size >= 1024 && i < units.length - 1) { size /= 1024; i++; }
+  return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+}
+function fmtDate(s) {
+  if (!s) return '';
+  // Normalize ISO '2026-05-16T03:51:13' → '2026-05-16 03:51'
+  var t = s.replace('T', ' ');
+  // Drop seconds if present: '2026-05-16 03:51:13' → '2026-05-16 03:51'
+  return t.replace(/(:\d{2})(:\d{2})$/, '$1');
+}
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function trunc(s, n) { return s.length > n ? s.slice(0, n) + '...' : s; }

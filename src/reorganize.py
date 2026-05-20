@@ -13,7 +13,7 @@ import json
 import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from db import connect
+from db import connect, upsert_file, upsert_file_jav, VIDEO_EXTS
 
 # Windows-unsafe filename chars
 _UNSAFE = re.compile(r'[:*?"<>|\\/]')
@@ -265,6 +265,8 @@ def _process_type(label, entries, cid_dirs, structure, target_base, conn,
 
             shutil.rmtree(src_path)
             print(f"  OK")
+            # Update file path records to reflect new location
+            _refresh_file_paths(conn, cid, label.lower(), dest_path)
             report.append(f"| {cid} | {src_folder} | {rel_path} | moved |")
             moved += 1
         except Exception as e:
@@ -288,6 +290,22 @@ def _walk_files(d):
     for root, dirs, files in os.walk(d):
         for f in files:
             yield os.path.join(root, f)
+
+
+def _refresh_file_paths(conn, cid, vtype, directory):
+    """Upsert file records for all video files found in directory."""
+    upsert = upsert_file if vtype == "fc2" else upsert_file_jav
+    for fname in os.listdir(directory):
+        ext = os.path.splitext(fname)[1].lower()
+        if ext not in VIDEO_EXTS:
+            continue
+        file_path = os.path.join(directory, fname)
+        file_size = os.path.getsize(file_path)
+        # Extract part number from filename
+        import re as _re
+        part_m = _re.search(r'[-_]pt(\d+)', fname, _re.IGNORECASE)
+        part = int(part_m.group(1)) if part_m else 1
+        upsert(conn, cid, directory, file_path, file_size, part)
 
 
 def _generate_structure_report(target_base, report_dir):
