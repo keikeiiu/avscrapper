@@ -127,6 +127,18 @@ python -m playwright install chromium
 | [desktop/README.md](desktop/README.md) | Desktop app — build, distribute, architecture |
 | [PLAN.md](PLAN.md) | Architecture overview, status, future roadmap |
 
+## Browse — Poster Grid View
+
+Open `/browse` for an *arr-style poster grid with cover art, real-time search, and filters:
+
+- **Deep search** — type in the search bar to filter across all metadata (CID, title, actors, studio, genres, tags, series, director, seller, actress)
+- **Faceted filters** — dropdowns for status, studio, series, director (JAV) or seller/actress (FC2), with counts
+- **Poster cards** — 3:4 cover images with title, CID, rating, file count, status badge
+- **Clickable files** — click a file name or folder path in the detail modal to open in your default player/Explorer
+- **Sort** — by scrape date, release date, title, rating, or file count; toggle asc/desc
+
+Set `host_mount_base` in config.yaml for Docker file-open path translation.
+
 ## Pipeline
 
 Run all steps sequentially with one click — open `/pipeline` in the web GUI or use the CLI:
@@ -148,6 +160,8 @@ docker compose run avscraper python avscraper.py pipeline
 | Flag | `python avscraper.py flag <site> --ids ...` | Mark entries for re-scrape |
 | Reorganize | `python avscraper.py reorganize` | Move folders into metadata-driven hierarchy |
 | Audit | `python avscraper.py audit` | Compare metadata duration vs actual video duration |
+| Dedup | `python avscraper.py dedup <dir>` | Scan directory for JAV files, identify duplicates already in DB |
+| Path Audit | `python avscraper.py path-audit` | Verify file paths on disk match DB; `--repair` to auto-fix |
 
 ## Sites
 
