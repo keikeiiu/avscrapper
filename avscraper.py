@@ -133,6 +133,9 @@ def main():
     elif command == "check":
         from src.health_check import run_checks
         run_checks(config_path)
+    elif command == "update-studios":
+        from src.update_studio_map import main as _update_studios
+        _update_studios()
     elif command == "setup":
         _setup(config, config_path)
     else:
