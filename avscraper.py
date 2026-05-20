@@ -10,6 +10,8 @@ Usage:
     python avscraper.py reorganize --report
     python avscraper.py flag fc2ppvdb --ids 123456,789012
     python avscraper.py flag javdb --ids SSIS-123
+    python avscraper.py path-audit --repair
+    python avscraper.py dedup ./downloads --move
 """
 
 import sys
@@ -124,6 +126,10 @@ def main():
             print("Usage: python avscraper.py flag <site> --ids <cids>")
             return
         _flag_entries(config_path, site, flag_args)
+    elif command == "path-audit":
+        _run_script("path_audit.py", *extra)
+    elif command == "dedup":
+        _run_script("dedup.py", *extra)
     elif command == "setup":
         _setup(config, config_path)
     else:
