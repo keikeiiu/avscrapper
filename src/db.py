@@ -98,6 +98,56 @@ def init_db(db_path):
             FOREIGN KEY (cid) REFERENCES jav_entries(cid)
         );
 
+        CREATE TABLE IF NOT EXISTS uncensored_entries (
+            cid              TEXT PRIMARY KEY,
+            site             TEXT NOT NULL,
+            full_number      TEXT,
+            title            TEXT,
+            title_en         TEXT,
+            plot             TEXT,
+            studio           TEXT,
+            label            TEXT,
+            series           TEXT,
+            director         TEXT,
+            release_date     TEXT,
+            year             TEXT,
+            runtime          TEXT,
+            runtime_seconds  INT,
+            cover_url        TEXT,
+            fanart_urls      TEXT,
+            genres           TEXT,
+            actors           TEXT,
+            rating           REAL,
+            votes            INT,
+            url              TEXT,
+            source           TEXT,
+            status           TEXT DEFAULT 'pending',
+            error_message    TEXT,
+            scraped_at       TEXT,
+            audit_status     TEXT,
+            last_audited     TEXT,
+            cover_path       TEXT,
+            user_notes       TEXT,
+            user_rating      TEXT,
+            favorite         TEXT,
+            video_metadata   TEXT,
+            raw_json         TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS uncensored_files (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            cid              TEXT NOT NULL,
+            directory_path   TEXT,
+            file_path        TEXT,
+            file_size        INTEGER,
+            duration_seconds REAL,
+            duration_str     TEXT,
+            part_number      INTEGER DEFAULT 1,
+            auto_part        INTEGER DEFAULT 0,
+            path_status      TEXT,
+            FOREIGN KEY (cid) REFERENCES uncensored_entries(cid)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_fc2_entries_status ON fc2_entries(status);
         CREATE INDEX IF NOT EXISTS idx_fc2_entries_source ON fc2_entries(source);
         CREATE INDEX IF NOT EXISTS idx_fc2_files_cid ON fc2_files(cid);
@@ -105,9 +155,13 @@ def init_db(db_path):
         CREATE INDEX IF NOT EXISTS idx_jav_entries_status ON jav_entries(status);
         CREATE INDEX IF NOT EXISTS idx_jav_entries_source ON jav_entries(source);
         CREATE INDEX IF NOT EXISTS idx_jav_files_cid ON jav_files(cid);
+
+        CREATE INDEX IF NOT EXISTS idx_uncensored_entries_status ON uncensored_entries(status);
+        CREATE INDEX IF NOT EXISTS idx_uncensored_entries_site ON uncensored_entries(site);
+        CREATE INDEX IF NOT EXISTS idx_uncensored_files_cid ON uncensored_files(cid);
     """)
     # Migrate existing databases
-    for table in ("fc2_entries", "jav_entries"):
+    for table in ("fc2_entries", "jav_entries", "uncensored_entries"):
         for col in ("audit_status", "last_audited", "region", "cover_path", "user_notes", "user_rating", "favorite", "video_metadata"):
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
@@ -527,3 +581,93 @@ def get_flagged_jav(conn, source=None):
             "SELECT * FROM jav_entries WHERE status='flagged' ORDER BY cid"
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Uncensored CRUD ──
+
+def insert_pending_uncensored(conn, cid, full_number, source, url=None):
+    """Insert an uncensored entry as pending. No-op if already exists."""
+    conn.execute(
+        "INSERT OR IGNORE INTO uncensored_entries (cid, full_number, source, site, url, status) VALUES (?, ?, ?, ?, ?, 'pending')",
+        (cid, full_number, source, source, url)
+    )
+    conn.commit()
+
+
+def upsert_scraped_uncensored(conn, cid, data, source, site):
+    """Upsert scraped uncensored data into uncensored_entries."""
+    conn.execute(
+        """INSERT INTO uncensored_entries (cid, site, full_number, title, title_en, plot,
+            studio, label, series, director, release_date, year,
+            runtime, runtime_seconds, cover_url, fanart_urls, genres,
+            actors, rating, votes, url, source,
+            status, scraped_at, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scraped', datetime('now'), ?)
+        ON CONFLICT(cid) DO UPDATE SET
+            title=excluded.title, title_en=excluded.title_en, plot=excluded.plot,
+            studio=excluded.studio, label=excluded.label, series=excluded.series,
+            director=excluded.director, release_date=excluded.release_date,
+            year=excluded.year, runtime=excluded.runtime,
+            runtime_seconds=excluded.runtime_seconds, cover_url=excluded.cover_url,
+            fanart_urls=excluded.fanart_urls, genres=excluded.genres,
+            actors=excluded.actors, rating=excluded.rating, votes=excluded.votes,
+            url=excluded.url, source=excluded.source,
+            status='scraped', scraped_at=datetime('now'), raw_json=excluded.raw_json""",
+        (cid, site, data.get("full_number", cid), data.get("title"), data.get("title_en"),
+         data.get("plot"), data.get("studio"), data.get("label"), data.get("series"),
+         data.get("director"), data.get("release_date"), data.get("year"),
+         data.get("runtime"), data.get("runtime_seconds"), data.get("cover_url"),
+         json.dumps(data.get("fanart_urls", []), ensure_ascii=False),
+         json.dumps(data.get("genres", []), ensure_ascii=False),
+         json.dumps(data.get("actors", []), ensure_ascii=False),
+         data.get("rating"), data.get("votes"), data.get("url"), source,
+         json.dumps(data, ensure_ascii=False))
+    )
+    _cache_cover(conn, "uncensored_entries", cid, data.get("cover_url"))
+    conn.commit()
+
+
+def mark_flagged_uncensored(conn, cid):
+    """Mark an uncensored entry as flagged for re-scrape."""
+    conn.execute("UPDATE uncensored_entries SET status='flagged', error_message=NULL WHERE cid=?", (cid,))
+    conn.commit()
+
+
+def get_pending_uncensored(conn, source=None):
+    if source:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status='pending' AND source=? ORDER BY cid", (source,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status='pending' ORDER BY cid").fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_scraped_uncensored(conn, source=None):
+    if source:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status='scraped' AND source=? ORDER BY cid", (source,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status='scraped' ORDER BY cid").fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_errors_uncensored(conn, source=None):
+    if source:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status IN ('error','404','flagged') AND source=? ORDER BY cid", (source,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status IN ('error','404','flagged') ORDER BY cid").fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_flagged_uncensored(conn, source=None):
+    if source:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status='flagged' AND source=? ORDER BY cid", (source,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM uncensored_entries WHERE status='flagged' ORDER BY cid").fetchall()
+    return [dict(r) for r in rows]
+
+
+def insert_file_uncensored(conn, cid, directory_path, file_path, file_size=None, part_number=1):
+    conn.execute(
+        "INSERT INTO uncensored_files (cid, directory_path, file_path, file_size, part_number) VALUES (?, ?, ?, ?, ?)",
+        (cid, directory_path, file_path, file_size, part_number)
+    )
+    conn.commit()

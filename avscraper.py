@@ -96,6 +96,8 @@ def main():
             scraper = "sites/fc2ppvdb/fc2ppvdb_scraper.py"
         elif site == "javdb":
             scraper = "sites/javdb/javdb_scraper.py"
+        elif site == "caribbeancom":
+            scraper = "sites/caribbean/caribbean_scraper.py"
         else:
             print(f"Unknown site: {site}")
             return

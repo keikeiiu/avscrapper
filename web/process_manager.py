@@ -59,6 +59,12 @@ ACTIONS = {
         "params": ["ids"],
         "kw": {"ids": "--ids"},
     },
+    "scrape_caribbean": {
+        "cmd": [sys.executable, "avscraper.py", "scrape", "caribbeancom"],
+        "params": ["ids", "delay", "dry_run"],
+        "flags": {"dry_run": "--dry-run"},
+        "kw": {"ids": "--ids", "delay": "--delay"},
+    },
     "pipeline": {
         "steps": [
             {"key": "ingest",     "label": "Ingest",       "action": "ingest"},
@@ -67,11 +73,12 @@ ACTIONS = {
             {"key": "enrich_fc2", "label": "Enrich FC2",   "action": "enrich_fc2"},
             {"key": "enrich_jav", "label": "Enrich JAV",   "action": "enrich_jav"},
             {"key": "reorganize", "label": "Reorganize",   "action": "reorganize"},
+            {"key": "scrape_caribbean", "label": "Scrape Caribbean", "action": "scrape_caribbean"},
         ],
         "params": ["dry_run", "skip_scrape", "skip_enrich"],
         "flags": {"dry_run": "--dry-run"},
         "skip_groups": {
-            "skip_scrape": ["scrape_fc2", "scrape_jav"],
+            "skip_scrape": ["scrape_fc2", "scrape_jav", "scrape_caribbean"],
             "skip_enrich": ["enrich_fc2", "enrich_jav"],
         },
     },

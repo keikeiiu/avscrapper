@@ -119,3 +119,8 @@ sites:
       # From F12 → Application → Cookies → javdb.com
       over18: "1"
       _jdb_session: ""
+  caribbeancom:
+    base_url: "https://www.caribbeancom.com"
+    scrape_delay_seconds: "5-20"
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
+    cookies: {}

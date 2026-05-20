@@ -10,21 +10,35 @@ import yaml
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v"}
 FC2_RE = re.compile(r'FC2[ -]?PPV[ -]?(\d{6,8})', re.IGNORECASE)
 JAV_RE = re.compile(r'\b([A-Z]{2,6}[ -]?\d{2,5})\b')
+UNCENSORED_RE = re.compile(r'\b(\d{6}[-_]\d{3,4})\b')
 PART_RE = re.compile(r'[-_ ](?:part\s*|pt\s*|cd\s*|dvd\s*|disk\s*|disc\s*)(\d+)\b', re.IGNORECASE)
+
+# Uncensored site mapping: CID pattern → site name
+UNCENSORED_SITES = {
+    "caribbeancom": re.compile(r'^\d{6}-\d{3,4}$'),
+}
 
 
 def detect_type(filename):
-    """Return (type, id, part_number) or None."""
+    """Return (type, id, site, part_number) or None."""
     stem = os.path.splitext(filename)[0]
 
     m = FC2_RE.search(stem)
     if m:
-        return ("fc2", m.group(1), _part_number(stem))
+        return ("fc2", m.group(1), None, _part_number(stem))
 
     m = JAV_RE.search(stem)
     if m:
         jid = m.group(1).upper().replace(" ", "-").replace("_", "-")
-        return ("jav", jid, _part_number(stem))
+        return ("jav", jid, None, _part_number(stem))
+
+    m = UNCENSORED_RE.search(stem)
+    if m:
+        cid = m.group(1).replace("_", "-")
+        for site, pattern in UNCENSORED_SITES.items():
+            if pattern.match(cid):
+                return ("uncensored", cid, site, _part_number(stem))
+        return ("uncensored", cid, "caribbeancom", _part_number(stem))
 
     return None
 
@@ -122,7 +136,7 @@ def clean_filename(info):
 
 
 def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False, enrich=False, confirm=False, report_dir=None):
-    from db import connect, init_db, insert_pending, insert_pending_jav, upsert_file, upsert_file_jav
+    from db import connect, init_db, insert_pending, insert_pending_jav, insert_pending_uncensored, upsert_file, upsert_file_jav, insert_file_uncensored
 
     if not os.path.isdir(source):
         print(f"Source directory not found: {source}")
@@ -143,12 +157,13 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     for fname in files:
         info = detect_type(fname)
         if info:
-            vtype, cid, part = info
+            vtype, cid, site, part = info
             ext = os.path.splitext(fname)[1].lower()
             results.append({
                 "original": fname,
                 "type": vtype,
                 "cid": cid,
+                "site": site,
                 "part": part,
                 "ext": ext,
                 "auto_part": False,
@@ -182,6 +197,9 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         if r["type"] == "fc2":
             folder_name = f"FC2-PPV-{r['cid']}"
             target_base = fc2_target
+        elif r["type"] == "uncensored":
+            folder_name = r["cid"]
+            target_base = jav_target  # uncensored goes to same staging as JAV
         else:
             folder_name = r["cid"]
             target_base = jav_target
@@ -275,8 +293,15 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         if r["type"] is None:
             continue
 
-        target_base = fc2_target if r["type"] == "fc2" else jav_target
-        folder = f"FC2-PPV-{r['cid']}" if r["type"] == "fc2" else r["cid"]
+        if r["type"] == "fc2":
+            target_base = fc2_target
+            folder = f"FC2-PPV-{r['cid']}"
+        elif r["type"] == "uncensored":
+            target_base = jav_target
+            folder = r["cid"]
+        else:
+            target_base = jav_target
+            folder = r["cid"]
         dest_dir = os.path.join(target_base, folder)
         dest_path = os.path.join(dest_dir, clean_filename(r))
 
@@ -290,6 +315,11 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
             insert_pending(conn, r["cid"], full_number, "fc2ppvdb",
                           f"https://fc2ppvdb.com/articles/{r['cid']}")
             upsert_file(conn, r["cid"], dest_dir, dest_path, file_size, r["part"])
+        elif r["type"] == "uncensored":
+            site = r.get("site", "caribbeancom")
+            insert_pending_uncensored(conn, r["cid"], full_number, site,
+                          f"https://{site}.com/moviepages/{r['cid']}/index.html")
+            insert_file_uncensored(conn, r["cid"], dest_dir, dest_path, file_size, r["part"])
         else:
             insert_pending_jav(conn, r["cid"], full_number, "javdb",
                              f"https://javdb.com/search?q={r['cid']}&f=all")

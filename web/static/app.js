@@ -386,7 +386,7 @@ async function viewReport(name) {
 // ── Pipeline ───────────────────────
 var pipeStartTime = 0;
 var pipeDoneCount = 0;
-var pipeTotal = 6;
+var pipeTotal = 7;
 
 function runPipeline() {
   const btn = document.getElementById('run-pipeline-btn');
