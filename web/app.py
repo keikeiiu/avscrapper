@@ -289,6 +289,38 @@ def api_user_data(cid):
     return jsonify({"status": "updated"})
 
 
+@app.route("/api/metadata/<cid>")
+def api_metadata(cid):
+    """Get ffprobe metadata for the first video file of a CID."""
+    from src.db import connect
+    conn = connect(config["db_path"])
+    # Check cached first
+    row = conn.execute(
+        "SELECT video_metadata FROM fc2_entries WHERE cid=? AND video_metadata IS NOT NULL UNION ALL SELECT video_metadata FROM jav_entries WHERE cid=? AND video_metadata IS NOT NULL LIMIT 1",
+        (cid, cid)
+    ).fetchone()
+    if row and row["video_metadata"]:
+        conn.close()
+        import json as _json
+        return jsonify(_json.loads(row["video_metadata"]))
+    # Find first file for this CID
+    frow = conn.execute(
+        "SELECT file_path FROM fc2_files WHERE cid=? UNION ALL SELECT file_path FROM jav_files WHERE cid=? LIMIT 1",
+        (cid, cid)
+    ).fetchone()
+    conn.close()
+    if not frow or not frow["file_path"]:
+        return jsonify({"error": "No file found"}), 404
+    path = frow["file_path"]
+    if not os.path.isfile(path):
+        return jsonify({"error": "File not on disk"}), 404
+    from src.duration_audit import _ffprobe_metadata
+    meta = _ffprobe_metadata(path)
+    if not meta:
+        return jsonify({"error": "ffprobe failed"}), 500
+    return jsonify(meta)
+
+
 @app.route("/api/action/history")
 def api_history():
     return jsonify(list(action_history))

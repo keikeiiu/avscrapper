@@ -27,6 +27,56 @@ def _find_ffprobe():
     return None
 
 
+def _ffprobe_metadata(filepath):
+    """Extract video metadata via ffprobe JSON. Returns dict or None."""
+    ffprobe = getattr(_ffprobe_duration, "_path", None)
+    if ffprobe is None:
+        ffprobe = _find_ffprobe()
+        _ffprobe_duration._path = ffprobe or "ffprobe"
+    if not ffprobe:
+        return None
+    try:
+        result = subprocess.run(
+            [ffprobe, "-v", "quiet", "-print_format", "json",
+             "-show_format", "-show_streams", filepath],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            import json
+            data = json.loads(result.stdout)
+            info = {}
+            fmt = data.get("format", {})
+            info["duration"] = float(fmt.get("duration", 0)) if fmt.get("duration") else None
+            info["bitrate"] = int(fmt.get("bit_rate", 0)) // 1000 if fmt.get("bit_rate") else None  # kbps
+            for stream in data.get("streams", []):
+                if stream.get("codec_type") == "video":
+                    info["codec"] = stream.get("codec_name", "")
+                    info["width"] = stream.get("width")
+                    info["height"] = stream.get("height")
+                    info["fps"] = _parse_fps(stream.get("r_frame_rate", ""))
+                    break
+            for stream in data.get("streams", []):
+                if stream.get("codec_type") == "audio":
+                    info["audio_codec"] = stream.get("codec_name", "")
+                    info["audio_channels"] = stream.get("channels")
+                    break
+            return info
+    except Exception:
+        pass
+    return None
+
+
+def _parse_fps(rate_str):
+    """Parse '30000/1001' or '24/1' to float."""
+    if "/" in rate_str:
+        try:
+            num, den = rate_str.split("/")
+            return round(float(num) / float(den), 2)
+        except (ValueError, ZeroDivisionError):
+            return None
+    return None
+
+
 def _ffprobe_duration(filepath):
     """Get video duration in seconds via ffprobe. Returns float or None."""
     ffprobe = getattr(_ffprobe_duration, "_path", None)
