@@ -1,5 +1,27 @@
 # AV Scraper — Plan
 
+## Quick Start (for continuing on Mac)
+
+```bash
+git clone https://github.com/keikeiiu/avscrapper.git
+cd avscrapper
+pip install -r requirements.txt
+playwright install chromium
+
+# Copy your config (with _jdb_session cookie) or create from example
+cp config.example.yaml config.yaml   # edit paths + cookies
+
+# Optional: use the test DB from the media-stack repo (141 JAV entries scraped)
+git clone https://github.com/keikeiiu/media-stack-docker-compose.git ../media-stack-docker-compose
+cp ../media-stack-docker-compose/avscrappertools/av_data.db ./appdata/av_data.db
+
+# Start web GUI
+python web/app.py
+# Open http://127.0.0.1:3721/browse
+```
+
+**Test DB:** `media-stack-docker-compose/avscrappertools/av_data.db` (610 KB, 141 JAV entries, 119 with file paths)
+
 ## Current Architecture
 
 ```
