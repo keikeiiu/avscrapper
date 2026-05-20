@@ -121,101 +121,176 @@ See [README.cli.md](README.cli.md) for full reference.
 
 Priority order based on impact/effort. Every feature targets both Docker and Windows Desktop.
 
+---
+
 ### 1. Cookie Health Check (High Value / Low Effort)
 
-Verify cookies before scraping to avoid 100+ `login_required` failures.
+Before scraping, verify cookies are still valid to avoid wasting time on 100+ `login_required` failures.
 
-- `python avscraper.py check` — launch headless browser with stored cookies, verify HTTP 200
+- Add `python avscraper.py check` command
+- For each site: launch headless browser with stored cookies, navigate to a known page, check HTTP status
 - Report: "fc2ppvdb: OK / javdb: session expired"
 - Web UI: health status indicator on dashboard + Config page "Test Scraper" button
 
 ### 2. Studio Mapping Scraper (Low-Medium Effort)
 
-Scrape `javdb.com/makers` + `/makers/uncensored` for a comprehensive `studio_map`.
+Scrape `https://javdb.com/makers` and `https://javdb.com/makers/uncensored` to build a comprehensive `studio_map` with canonical English names.
 
-- Reuse Playwright + `_jdb_session` cookie. Script: `python avscraper.py update-studios`
-- Extract primary name + alternate names per maker; map Japanese → English canonical
-- `studio_map` grows from 63 → 300+ entries. Merge with existing, keep user edits.
-- Uncensored page requires login (redirects `/login` without session)
-- Known uncensored: Caribbeancom, 1Pondo, Heyzo, 10musume, Pacopacomama, etc.
+**Approach:**
+- Reuse Playwright + existing `_jdb_session` cookie from config
+- Script: `python avscraper.py update-studios` (or `python src/update_studio_map.py`)
+- For each maker on javdb:
+  - Extract primary name (bold text) + alternate names from the listing
+  - Map Japanese names (e.g., `マドンナ`) → English canonical (e.g., `Madonna`)
+  - Map alternate names (e.g., `蚊香社` → `PRESTIGE`)
+- Write updated `studio_map` into config.yaml (merge with existing, keep user edits)
 
-### 3. Cover Image Caching
+**Censored page 1 sample (50 makers, ~300+ total across 6 pages):**
+- S1 NO.1 STYLE, MOODYZ, FALENO, PRESTIGE/プレステージ, IDEA POCKET, kawaii
+- E-BODY, Madonna/マドンナ, Attackers, ワンズファクトリー, 溜池ゴロー, OPPAI
+- Premium/プレミアム, Fitch, SOD Create, KMP/ケイ・エム・プロデュース, etc.
+- Many have dual Japanese/English names needing mapping
 
-`cover_url` points to external CDNs — download locally to avoid broken/missing posters.
+**Uncensored makers page:**
+- Requires login (redirects to `/login` without session)
+- Will use `_jdb_session` cookie via Playwright for access
+- Known uncensored studios to expect: Caribbeancom, 1Pondo, Heyzo, 10musume, Pacopacomama, etc.
 
-- Add `cover_path` column. On scrape, download to `appdata/covers/{cid}.jpg`
-- `/api/cover/<cid>` endpoint. Browse uses local cover, remote as fallback.
-- Backfill existing: `--download-covers` flag on scrape
+**Output:** `studio_map` in config.yaml grows from 63 → 300+ entries. Japanese → English canonical mappings auto-generated. User reviews and adjusts after generation.
 
-### 4. Missing File Detection
+### 3. Cover Image Caching (High Impact / Low Effort)
 
-Detect entries whose files have been moved/deleted outside the app.
+Currently `cover_url` points to external CDNs (jdbstatic.com, fc2ppvdb.com). These can go down, change URLs, or block hotlinking. Download covers locally, serve from Flask, and fall back gracefully.
 
-- Extend `path_audit.py` to check entries with no file records
-- "Files missing" filter + badge on browse page
+- Add a `cover_path` column to entries tables (local file path)
+- On scrape, download the cover image to `appdata/covers/{cid}.jpg`
+- Serve via `/api/cover/<cid>` endpoint
+- Browse page uses local covers when available, remote as fallback
+- Existing entries can be backfilled with a `--download-covers` flag on scrape
 
-### 5. Browse Page Improvements
+### 4. Missing File Detection (High Impact / Low Effort)
 
-- **Keyboard shortcuts**: `j`/`k` next/prev, `Enter` detail, `f` play, `Esc` close
-- **Infinite scroll**: auto-load next page near bottom
-- **Grid density toggle**: small/medium/large cards
-- **Card right-click**: open file, open folder, copy CID, flag
+Entries exist in the DB but their files may have been moved/deleted outside the app. Detect and surface this.
 
-### 6. User Favorites
+- Extend `path_audit.py` to also check entries that have NO file records
+- Add a `no_files` status or flag to the browse page filter dropdown
+- Show "Files missing" badge on poster cards when files can't be found
 
-Simple curation layer on top of scraped metadata.
+### 5. Browse Page Improvements (Low-Medium Effort)
 
-- `favorite` boolean column on entries. Filter in browse. Toggle from detail modal.
-- `user_notes` TEXT and `user_rating` INTEGER (1-5) for later iteration
-- `watched` deferred — app doesn't provide a watch function yet
+- **Keyboard shortcuts**: `j`/`k` for next/prev card, `Enter` to open detail, `f` to play first file, `Esc` to close modal
+- **Infinite scroll**: load next page automatically when scrolling near bottom
+- **Grid density toggle**: small/medium/large card sizes
+- **Card right-click context menu**: open file, open folder, copy CID, flag
 
-### 7. Video Metadata Extraction
+### 6. User Data Layer (Medium Effort)
 
-Beyond duration, extract codec, resolution, bitrate, framerate, audio tracks via ffprobe.
+Let users add their own data on top of scraped metadata.
 
-- Store in `video_metadata` JSON column. Show in detail modal: "1080p · h264 · 5.2 Mbps · AAC"
-- Filter by resolution in browse: 720p/1080p/4K
+- `user_notes` TEXT column on entries — free-text notes
+- `user_rating` INTEGER — 1-5 stars
+- `favorite` boolean flag — toggle from detail modal, filter in browse
+- Browse page: filter by favorites only
+- Detail modal: editable notes field, star rating widget
 
-### 8. Watch Folder / Auto-Ingest
+**Scope note:** `watched` deferred — app doesn't provide a watch function yet (keep as future option).
 
-Detect new files and trigger ingest on a cron schedule.
+### 7. Video Metadata Extraction (Medium Impact / Medium Effort)
 
-- Config: `watch_schedule: "0 */6 * * *"` (cron format). Uses `croniter` package.
-- Background thread. Web UI: toggle + next-run display + SSE notifications.
+Beyond duration, extract rich video metadata using ffprobe.
 
-### 9. Uncensored Scrapers
+- Extract: codec (h264/h265), resolution (1080p/4K), bitrate, framerate, audio codec, subtitle tracks
+- Store in new columns (or a `video_metadata` JSON column)
+- Show on detail modal: "1080p · h264 · 5.2 Mbps · AAC"
+- Filter by resolution in browse page: 720p/1080p/4K
 
-Each uncensored site has its own CID format. Add incrementally.
+### 8. Watch Folder / Auto-Ingest (Medium Impact / Medium Effort)
 
-| Site | CID Pattern | Example |
-|------|-------------|---------|
-| Caribbeancom | `\\d{6}-\\d{3,4}` | `123011-900` |
-| 1Pondo | `1pon[\\s_-]\\d{6}[\\s_-]\\d{3}` | `1pon-021717_484` |
-| Heyzo | `[Hh][Ee][Yy][Zz][Oo][\\s_-]?\\d{4}` | `HEYZO-2625` |
-| 10musume | `10mu[\\s_-]\\d{6}[\\s_-]\\d{2}` | `10mu-123017_01` |
-| Pacopacomama | `paco[\\s_-]\\d{6}[\\s_-]\\d{3}` | `paco-123017_123` |
+Detect new files dropped into the source directory and auto-trigger ingest.
 
-- New `src/sites/{site}/` modules: scraper, NFO, enricher following existing pattern
-- New DB table per site (or `site` column on shared `uncensored_entries`)
-- Extend `detect_type()` in ingest.py. Start with Caribbeancom.
+- Config: `watch_schedule: "0 */6 * * *"` (cron format — every 6 hours)
+- Add `croniter` dependency for cron expression parsing
+- Background thread checks "is it time to run?" on each cron tick
+- Human-readable examples in config:
+  - `"0 */6 * * *"` — every 6 hours
+  - `"0 3 * * *"` — daily at 3 AM
+  - `"0 0 * * 0"` — weekly on Sunday midnight
+  - `""` (empty) — disabled
+- Web UI: "Auto-ingest" toggle + next scheduled run time display
+- SSE notification: "Ingest complete: 5 new, 2 skipped"
 
-### Platform Notes
+### 9. Batch Operations (Medium Impact / Medium Effort)
+
+Bulk actions beyond the current single-entry flag.
+
+- Bulk re-scrape (flag multiple + trigger scrape)
+- Bulk delete entries + files
+- Bulk mark as reviewed/ignored
+- Selection: click checkbox on cards, shift-click range select
+
+### 10. Config & Setup UX (Low Effort)
+
+- Add `avscraper.py check` for cookie validation (shared with item #1)
+- Add test-connection button in Config page: "Test Scraper" → headless browser test
+- Validation warnings in config editor (missing required cookies, invalid paths)
+
+### 11. Uncensored Scrapers (High Impact / High Effort)
+
+Each uncensored site has its own CID format, scraper, and metadata layout. Add incrementally.
+
+#### Site formats
+
+| Site | CID Pattern | Example | Scraper URL |
+|------|-------------|---------|-------------|
+| Caribbeancom | `\d{6}-\d{3,4}` | `123011-900` | caribbeancom.com |
+| 1Pondo | `1pon[\s_-]\d{6}[\s_-]\d{3}` | `1pon-021717_484` | 1pondo.tv |
+| Heyzo | `[Hh][Ee][Yy][Zz][Oo][\s_-]?\d{4}` | `HEYZO-2625` | heyzo.com |
+| 10musume | `10mu[\s_-]\d{6}[\s_-]\d{2}` | `10mu-123017_01` | 10musume.com |
+| Pacopacomama | `paco[\s_-]\d{6}[\s_-]\d{3}` | `paco-123017_123` | pacopacomama.com |
+
+#### Implementation approach
+- New scraper modules: `src/sites/caribbean/`, `src/sites/1pondo/`, etc.
+- Each with `_scraper.py`, `_nfo.py`, `_enricher.py` following existing pattern
+- New DB table per site (or a `site` column on a shared `uncensored_entries` table)
+- CID detection: extend `detect_type()` in ingest.py with new patterns
+- Ingest: `_Unprocessed/uncensored/{site}/{cid}/` folder structure
+- Start with one site (Caribbeancom — simplest pattern), add others incrementally
+
+### Priority Order
+
+| # | Item | Why |
+|---|------|-----|
+| 1 | Cookie Health Check | Prevents wasting hours on failed scrapes |
+| 2 | Studio Mapping Scraper | Comprehensive studio_map from javdb (63→300+) |
+| 3 | Cover Image Caching | Fixes broken/missing posters in browse grid |
+| 4 | Missing File Detection | Critical data integrity for file management |
+| 5 | Browse Shortcuts | Daily-use UX — keyboard nav, infinite scroll |
+| 6 | User Favorites | Simple curation: favorite flag, filter, star rating |
+| 7 | Video Metadata | Resolution/codec info for filtering and display |
+| 8 | Watch Folder (cron) | Automate the first pipeline step on a schedule |
+| 9 | Batch Operations | Bulk management at scale (flag, delete, review) |
+| 10 | Config UX | Health check button, validation warnings |
+| 11 | Uncensored Scrapers | New content sources (Caribbeancom → 1Pondo → ...) |
+
+### Docker + Desktop Compatibility
+
+Every feature must work in both environments:
 
 | Concern | Desktop (Native) | Docker |
 |---------|-----------------|--------|
-| File paths | Native Windows paths | `/app/...` container paths |
-| File opening | `os.startfile()` | `host_mount_base` translation |
+| File paths | Native OS paths | `/app/...` container paths |
+| File opening | `os.startfile()` (Win) / `open` (Mac) / `xdg-open` (Linux) | `host_mount_base` translation → returns host path |
 | Scheduling | Background thread | Container cron or thread |
-| Config | `config.example.yaml` covers both with comments |
+| Config | `config.example.yaml` covers both with comments | Same |
 
 ### Tech Stack Leftovers
 
 | Item | Notes |
 |------|-------|
-| macOS desktop build | Package config exists. Need PyInstaller on macOS runner + CI workflow. |
-| Tauri shell | Replace Electron, ~5 MB binary. Need Rust IPC bridge to Python backend. |
+| macOS desktop build | Package config exists (`dmg` target in electron-builder). Need: PyInstaller on macOS runner, CI workflow variant, testing. |
+| Tauri shell (replace Electron) | Rust-based desktop wrapper. Binary ~5 MB vs Electron's 180 MB. Need Rust shim layer for IPC to Python backend. Risk: moderate. |
 | JavBus fallback | When JavDB returns 404 |
-| Obscura browser backend | CDP-compatible, ~30MB memory, anti-fingerprinting. Evaluate when mature. |
+| Obscura browser backend | CDP-compatible drop-in for Chromium, ~30MB memory, built-in anti-fingerprinting. Evaluate when mature. |
 
 ## Tech Stack Analysis (2026-05)
 
