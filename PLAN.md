@@ -117,15 +117,105 @@ python avscraper.py audit [--dry-run] [--type fc2|jav] [--ids ...]
 
 See [README.cli.md](README.cli.md) for full reference.
 
-## Future
+## Future Enhancements
+
+Priority order based on impact/effort. Every feature targets both Docker and Windows Desktop.
+
+### 1. Cookie Health Check (High Value / Low Effort)
+
+Verify cookies before scraping to avoid 100+ `login_required` failures.
+
+- `python avscraper.py check` — launch headless browser with stored cookies, verify HTTP 200
+- Report: "fc2ppvdb: OK / javdb: session expired"
+- Web UI: health status indicator on dashboard + Config page "Test Scraper" button
+
+### 2. Studio Mapping Scraper (Low-Medium Effort)
+
+Scrape `javdb.com/makers` + `/makers/uncensored` for a comprehensive `studio_map`.
+
+- Reuse Playwright + `_jdb_session` cookie. Script: `python avscraper.py update-studios`
+- Extract primary name + alternate names per maker; map Japanese → English canonical
+- `studio_map` grows from 63 → 300+ entries. Merge with existing, keep user edits.
+- Uncensored page requires login (redirects `/login` without session)
+- Known uncensored: Caribbeancom, 1Pondo, Heyzo, 10musume, Pacopacomama, etc.
+
+### 3. Cover Image Caching
+
+`cover_url` points to external CDNs — download locally to avoid broken/missing posters.
+
+- Add `cover_path` column. On scrape, download to `appdata/covers/{cid}.jpg`
+- `/api/cover/<cid>` endpoint. Browse uses local cover, remote as fallback.
+- Backfill existing: `--download-covers` flag on scrape
+
+### 4. Missing File Detection
+
+Detect entries whose files have been moved/deleted outside the app.
+
+- Extend `path_audit.py` to check entries with no file records
+- "Files missing" filter + badge on browse page
+
+### 5. Browse Page Improvements
+
+- **Keyboard shortcuts**: `j`/`k` next/prev, `Enter` detail, `f` play, `Esc` close
+- **Infinite scroll**: auto-load next page near bottom
+- **Grid density toggle**: small/medium/large cards
+- **Card right-click**: open file, open folder, copy CID, flag
+
+### 6. User Favorites
+
+Simple curation layer on top of scraped metadata.
+
+- `favorite` boolean column on entries. Filter in browse. Toggle from detail modal.
+- `user_notes` TEXT and `user_rating` INTEGER (1-5) for later iteration
+- `watched` deferred — app doesn't provide a watch function yet
+
+### 7. Video Metadata Extraction
+
+Beyond duration, extract codec, resolution, bitrate, framerate, audio tracks via ffprobe.
+
+- Store in `video_metadata` JSON column. Show in detail modal: "1080p · h264 · 5.2 Mbps · AAC"
+- Filter by resolution in browse: 720p/1080p/4K
+
+### 8. Watch Folder / Auto-Ingest
+
+Detect new files and trigger ingest on a cron schedule.
+
+- Config: `watch_schedule: "0 */6 * * *"` (cron format). Uses `croniter` package.
+- Background thread. Web UI: toggle + next-run display + SSE notifications.
+
+### 9. Uncensored Scrapers
+
+Each uncensored site has its own CID format. Add incrementally.
+
+| Site | CID Pattern | Example |
+|------|-------------|---------|
+| Caribbeancom | `\\d{6}-\\d{3,4}` | `123011-900` |
+| 1Pondo | `1pon[\\s_-]\\d{6}[\\s_-]\\d{3}` | `1pon-021717_484` |
+| Heyzo | `[Hh][Ee][Yy][Zz][Oo][\\s_-]?\\d{4}` | `HEYZO-2625` |
+| 10musume | `10mu[\\s_-]\\d{6}[\\s_-]\\d{2}` | `10mu-123017_01` |
+| Pacopacomama | `paco[\\s_-]\\d{6}[\\s_-]\\d{3}` | `paco-123017_123` |
+
+- New `src/sites/{site}/` modules: scraper, NFO, enricher following existing pattern
+- New DB table per site (or `site` column on shared `uncensored_entries`)
+- Extend `detect_type()` in ingest.py. Start with Caribbeancom.
+
+### Platform Notes
+
+| Concern | Desktop (Native) | Docker |
+|---------|-----------------|--------|
+| File paths | Native Windows paths | `/app/...` container paths |
+| File opening | `os.startfile()` | `host_mount_base` translation |
+| Scheduling | Background thread | Container cron or thread |
+| Config | `config.example.yaml` covers both with comments |
+
+### Tech Stack Leftovers
 
 | Item | Notes |
 |------|-------|
-| macOS desktop build | Package config exists (`dmg` target in electron-builder). Need: PyInstaller on macOS runner, CI workflow variant, testing. Playwright/Chromium + Python backend already cross-platform. |
-| Tauri shell (replace Electron) | Rust-based desktop wrapper. Binary ~5 MB vs Electron's 180 MB. Would need a Rust shim layer for IPC to the Python backend. Much smaller distributable. Risk: moderate — Tauri is stable but IPC bridge would need custom work. |
-| Uncensored JAV scraper | 123011-900 pattern. Caribbean/1Pondo/Heyzo |
+| macOS desktop build | Package config exists. Need PyInstaller on macOS runner + CI workflow. |
+| Tauri shell | Replace Electron, ~5 MB binary. Need Rust IPC bridge to Python backend. |
 | JavBus fallback | When JavDB returns 404 |
-| Obscura browser backend | Evaluate when more mature. CDP-compatible drop-in for Chromium, ~30MB memory, built-in anti-fingerprinting. Would replace Playwright's bundled Chromium via `connect_over_cdp`. Risk: early-stage. |
+| Obscura browser backend | CDP-compatible, ~30MB memory, anti-fingerprinting. Evaluate when mature. |
 
 ## Tech Stack Analysis (2026-05)
 
