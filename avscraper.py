@@ -130,6 +130,9 @@ def main():
         _run_script("path_audit.py", *extra)
     elif command == "dedup":
         _run_script("dedup.py", *extra)
+    elif command == "check":
+        from src.health_check import run_checks
+        run_checks(config_path)
     elif command == "setup":
         _setup(config, config_path)
     else:

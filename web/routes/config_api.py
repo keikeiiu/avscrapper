@@ -1,6 +1,7 @@
-"""Config Editor API — read and write config.yaml."""
+"""Config Editor API — read and write config.yaml, cookie health check."""
 import os
 import shutil
+import threading
 from flask import Blueprint, request, jsonify, current_app
 import yaml
 
@@ -50,3 +51,30 @@ def save_config():
         f.write(content)
 
     return jsonify({"status": "saved", "backup": os.path.basename(bak_path)})
+
+
+@config_bp.route("/api/check", methods=["POST"])
+def check_cookies():
+    """Run cookie health check in a background thread, return results when done."""
+    path = _config_path()
+    if not os.path.exists(path):
+        return jsonify({"error": "config.yaml not found"}), 404
+
+    results = {}
+
+    def _run():
+        try:
+            from src.health_check import check_site
+            with open(path, encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+            for name, cfg in config.get("sites", {}).items():
+                ok, detail = check_site(name, cfg)
+                results[name] = {"ok": ok, "detail": detail}
+        except Exception as e:
+            results["error"] = str(e)
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout=30)
+
+    return jsonify({"results": results})

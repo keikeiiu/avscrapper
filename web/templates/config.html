@@ -5,6 +5,7 @@
 <div class="btn-group" style="margin-bottom: 12px;">
   <button class="btn primary" id="config-load-btn" onclick="loadConfig()">Load Config</button>
   <button class="btn" id="config-save-btn" onclick="saveConfig()" disabled>Save</button>
+  <button class="btn" id="config-check-btn" onclick="checkCookies()">Test Scrapers</button>
 </div>
 
 <div id="config-status"></div>
@@ -47,6 +48,33 @@ async function loadConfig() {
   document.getElementById('config-save-btn').disabled = false;
   document.getElementById('config-status').innerHTML = '<span class="badge green">Loaded: ' + data.path + '</span>';
   showToast('Config loaded', 'success');
+}
+
+async function checkCookies() {
+  const btn = document.getElementById('config-check-btn');
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  document.getElementById('config-status').innerHTML = '<span class="spinner"></span> Testing scraper connections...';
+  try {
+    const resp = await fetch('/api/check', { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) {
+      document.getElementById('config-status').innerHTML = '<span class="badge red">' + data.error + '</span>';
+      showToast('Check failed: ' + data.error, 'error');
+    } else {
+      let html = '';
+      for (const [site, r] of Object.entries(data.results)) {
+        const cls = r.ok ? 'green' : 'red';
+        html += '<span class="badge ' + cls + '">' + site + ': ' + r.detail + '</span> ';
+      }
+      document.getElementById('config-status').innerHTML = html;
+      showToast('Check complete', 'success');
+    }
+  } catch(e) {
+    showToast('Check error: ' + e, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Test Scrapers';
 }
 
 async function saveConfig() {
