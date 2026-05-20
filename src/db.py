@@ -108,7 +108,7 @@ def init_db(db_path):
     """)
     # Migrate existing databases
     for table in ("fc2_entries", "jav_entries"):
-        for col in ("audit_status", "last_audited", "region", "cover_path"):
+        for col in ("audit_status", "last_audited", "region", "cover_path", "user_notes", "user_rating", "favorite"):
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
             except sqlite3.OperationalError:

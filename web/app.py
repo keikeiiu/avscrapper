@@ -93,6 +93,42 @@ config, config_dir = load_config()
 from src.db import init_db
 init_db(config["db_path"])
 app.config["APP_CONFIG"] = config
+
+# ── Watch Folder Scheduler ──
+def _start_watch_scheduler():
+    schedule = config.get("watch_schedule", "")
+    if not schedule:
+        return
+    import re
+    cron_match = re.match(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)', schedule)
+    if not cron_match:
+        return
+    minute, hour, dom, month, dow = [int(g) for g in cron_match.groups()]
+    def _check():
+        import time as _time
+        from datetime import datetime
+        last_run = None
+        while True:
+            now = datetime.now()
+            match = (
+                (minute == -1 or now.minute == minute) and
+                (hour == -1 or now.hour == hour) and
+                (month == -1 or now.month == month) and
+                (dow == -1 or now.weekday() + 1 == dow if dow != 0 else now.weekday() == 6)
+            )
+            if match and (last_run is None or (now - last_run).total_seconds() > 120):
+                last_run = now
+                import subprocess, sys
+                cmd = [sys.executable, "avscraper.py", "ingest", "--yes"]
+                src = config.get("ingest", {}).get("source", "")
+                if src:
+                    cmd.extend(["--source", src])
+                subprocess.Popen(cmd, cwd=config_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            _time.sleep(60)
+    t = __import__("threading").Thread(target=_check, daemon=True)
+    t.start()
+
+_start_watch_scheduler()
 app.config["ROOT_DIR"] = ROOT
 
 from web.routes.actions import actions_bp
@@ -223,6 +259,34 @@ def api_report(name):
     import markdown
     html = markdown.markdown(raw, extensions=["tables", "fenced_code"])
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/user/<cid>", methods=["GET", "POST"])
+def api_user_data(cid):
+    """Get or set user data (favorite, rating, notes) for an entry."""
+    from src.db import connect
+    conn = connect(config["db_path"])
+    # Find which table this CID belongs to
+    row = conn.execute("SELECT cid, favorite, user_rating, user_notes FROM fc2_entries WHERE cid=? UNION ALL SELECT cid, favorite, user_rating, user_notes FROM jav_entries WHERE cid=? LIMIT 1", (cid, cid)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"cid": row["cid"], "favorite": bool(row["favorite"]), "user_rating": row["user_rating"], "user_notes": row["user_notes"]})
+
+    data = request.get_json() or {}
+    table = "fc2_entries" if row["cid"].isdigit() and len(row["cid"]) >= 6 else "jav_entries"
+    if "favorite" in data:
+        conn.execute(f"UPDATE {table} SET favorite=? WHERE cid=?", (str(int(data["favorite"])), cid))
+    if "user_rating" in data:
+        conn.execute(f"UPDATE {table} SET user_rating=? WHERE cid=?", (str(data["user_rating"]), cid))
+    if "user_notes" in data:
+        conn.execute(f"UPDATE {table} SET user_notes=? WHERE cid=?", (data["user_notes"], cid))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "updated"})
 
 
 @app.route("/api/action/history")

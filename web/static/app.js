@@ -871,6 +871,30 @@ function statusColor(status) {
   }
 }
 
+// ── Keyboard Shortcuts (Browse page) ──
+document.addEventListener('keydown', function(e) {
+  if (!document.getElementById('browse-grid')) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+  var cards = document.querySelectorAll('#browse-grid .card');
+  var focused = document.querySelector('#browse-grid .card.focused');
+  var idx = focused ? Array.from(cards).indexOf(focused) : -1;
+  if (e.key === 'j' || e.key === 'ArrowDown') {
+    e.preventDefault(); focused && focused.classList.remove('focused');
+    var next = idx < cards.length - 1 ? cards[idx + 1] : null;
+    if (next) { next.classList.add('focused'); next.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  } else if (e.key === 'k' || e.key === 'ArrowUp') {
+    e.preventDefault(); focused && focused.classList.remove('focused');
+    var prev = idx > 0 ? cards[idx - 1] : cards[0];
+    if (prev) { prev.classList.add('focused'); prev.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  } else if (e.key === 'Enter' && focused) {
+    e.preventDefault(); focused.click();
+  } else if (e.key === 'f' && focused) {
+    e.preventDefault(); var fl = focused.querySelector('[data-file]'); if (fl) fl.click();
+  } else if (e.key === 'Escape') {
+    var modal = document.querySelector('.modal-overlay'); if (modal) modal.remove();
+  }
+});
+
 function formatSize(bytes) {
   if (!bytes) return '0 B';
   var units = ['B', 'KB', 'MB', 'GB', 'TB'];
