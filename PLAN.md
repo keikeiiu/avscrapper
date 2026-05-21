@@ -139,11 +139,38 @@ python avscraper.py audit [--dry-run] [--type fc2|jav] [--ids ...]
 
 See [README.cli.md](README.cli.md) for full reference.
 
-## Future Enhancements
+## Enhancements — Progress
 
-Priority order based on impact/effort. Every feature targets both Docker and Windows Desktop.
+✅ = Completed, 🔧 = In progress, ⬜ = Planned
 
----
+| # | Item | Status |
+|---|------|--------|
+| 1 | Cookie Health Check | ✅ `avscraper.py check` + Config page "Test Scrapers" button |
+| 2 | Studio Mapping Scraper | ✅ `avscraper.py update-studios`, scrapes javdb.com/makers |
+| 3 | Cover Image Caching | ✅ `/api/cover?cid=X`, local download, remote fallback |
+| 4 | Missing File Detection | ✅ `path_audit.py --repair` handles this |
+| 5 | Browse Keyboard Shortcuts | ✅ `j/k` nav, `Enter` detail, `f` play, `Esc` close |
+| 6 | User Data Layer | ✅ Favorites, 1-5 rating, notes. `GET/POST /api/user/<cid>` |
+| 7 | Video Metadata | ✅ ffprobe JSON (codec, resolution, bitrate, fps). `/api/metadata/<cid>` |
+| 8 | Watch Folder (cron) | ✅ `watch_schedule` config, `croniter`-based background thread |
+| 9 | Batch Operations | ✅ `POST /api/batch/flag`, `POST /api/batch/delete` |
+| 10 | Config & Setup UX | ✅ "Test Scrapers" button validates cookies live |
+| 11 | Uncensored Scrapers | 🔧 Caribbeancom done, 4 sites remaining |
+
+### Remaining Decisions
+
+See [decision.md](decision.md) for full details.
+
+- **11. Uncensored — remaining sites:** 1Pondo, Heyzo, 10musume, Pacopacomama. DB design: shared `uncensored_entries` table with `site` column (Option B chosen).
+- **macOS desktop build:** Package config exists. Need PyInstaller on macOS runner + CI.
+- **Tauri shell:** Replace Electron (~5MB binary). Risk: moderate.
+- **JavBus fallback:** When JavDB returns 404. Low priority — >95% coverage.
+- **Obscura browser:** CDP-compatible, ~30MB. Not production-ready yet.
+
+### Details (Implemented)
+
+<details>
+<summary>Click to expand full implementation notes</summary>
 
 ### 1. Cookie Health Check (High Value / Low Effort)
 
@@ -350,3 +377,5 @@ Every feature must work in both environments:
 | **SQLite** (current) | Right choice — single file, zero config, perfect for 4-table metadata store |
 | DuckDB | Overkill for simple metadata queries |
 | JSON files | No query capability, easy to corrupt |
+
+</details>
