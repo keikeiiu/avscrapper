@@ -1,126 +1,413 @@
-# AV Scraper — Example Configuration
-# Copy to config.yaml and fill in your paths + cookies.
-
-db_path: "./appdata/av_data.db"
-report_dir: "./appdata/reports"
+db_path: ./appdata/av_data.db
 
 # Docker: host mount base for translating container paths to host-accessible paths.
-# Example: if your docker-compose mounts /app/downloads ← /mnt/media/JAV
-# set host_mount_base: "/mnt/media/JAV"
+# When set, /app/processed/... → host_mount_base/processed/...
+# Example: host_mount_base: "/mnt/media"
 # host_mount_base: ""
 
-# Ingest — where downloads arrive and where organized files go
-ingest:
-  source: "./downloads"
-  fc2_target: "./processed"
-  jav_target: "./processed"
-
-# Reorganize — metadata-driven folder hierarchy
-# Duration audit
 duration_audit:
-  minor_threshold: 30
   hard_threshold: 60
-
+  minor_threshold: 30
+ingest:
+  fc2_target: ./processed
+  jav_target: ./processed
+  source: ./downloads
 reorganize:
-  target: "./reorganized"
-  fc2_structure: "FC2/{seller}/{premiered:4}/FC2-PPV-{cid} - {title:50}"
-  jav_structure: "JAV/{studio}/{code}/{series:40}/{cid} - {title:50}"
+  fc2_structure: FC2/{seller}/{premiered:4}/FC2-PPV-{cid} - {title:50}
+  jav_structure: JAV/{studio}/{code}/{series:40}/{cid} - {title:50}
+  series_map: {}
   studio_map:
-    # SOD group → canonical
-    SODクリエイト: SOD Create
-    SODマジックミラー号: SOD Create
-    SOD Create: SOD Create
-    # PRESTIGE
-    プレステージ: PRESTIGE
-    PRESTIGE: PRESTIGE
-    # WILL group
-    S1 NO.1 STYLE: S1 NO.1 STYLE
-    アイデアポケット: IDEAPOCKET
+    .WorKs/FALENO TUBE: .WorKs/FALENO TUBE
+    1000giri: 1000giri
+    1000人斬: 1000giri
+    1059.tokyo: 1059.tokyo
+    4K VR: 4K VR
+    91制片厂: 91制片厂
+    A-BOX: A-BOX
+    AEGEAN: AEGEAN
+    AFRO-FILM: AFRO-FILM
+    AGA: AGA
+    ALICE JAPAN: ALICE JAPAN
+    AMORE: AMORE
+    ANIMALIJO: ANIMALIJO
+    ARA: ARA
+    AROUND: AROUND
+    ASM: ASM
+    ATOM: ATOM
+    ATTACK ZONE: ATTACK ZONE
+    ATTACKERS: ATTACKERS
+    AVS: AVS
+    AVVR: AVVR
+    Air control: Air control
+    Amazing Picture: Amazing Picture
+    Arena Entertainment: Arena Entertainment
+    Athlete: Athlete
+    Attackers: Attackers
+    Aurora Project Annex: Aurora Project Annex
+    BACK DROP: BACK DROP
+    BAGUS: BAGUS
+    BAZOOKA: BAZOOKA
+    BEATLE: BEATLE
+    BEAUTY: BEAUTY
+    BODY: BODY
+    BOING: BOING
+    BOTAN: BOTAN
+    BRAVO: BRAVO
+    BRILL（JADE）: BRILL（JADE）
+    BUNGEE ENTERTAINMENT: BUNGEE ENTERTAINMENT
+    Baby Entertainment: Baby Entertainment
+    BeFree: BeFree
+    Berry Blue: Berry Blue
+    BiBiD: BiBiD
+    Brutal House: Brutal House
+    C-Format: C-Format
+    CASANOVA: CASANOVA
+    CATCHEYE: CATCHEYE
+    CATWALK: CATWALK
+    CHANGE: CHANGE
+    CHoBitcH: CHoBitcH
+    CMP: CMP
+    CORE: CORE
+    CRANE: CRANE
+    CREAM PIE: CREAM PIE
+    CROSS: CROSS
+    CRYSTAL VR: CRYSTAL VR
+    Centervillage: Centervillage
+    Climax Zipang: Climax Zipang
+    Close Market: Close Market
+    Cosmo Planets VR: Cosmo Planets VR
+    C＆H: C＆H
+    D-MODE: D-MODE
+    DAHLIA: DAHLIA
+    DANDY: DANDY
+    DAS: DAS
+    DIAMANTE DI DIGITALARK （Di3）: DIAMANTE DI DIGITALARK （Di3）
+    DIEGO: DIEGO
+    DIY: DIY
+    DOC: DOC
+    Daruma: Daruma
+    Digital Ark: Digital Ark
+    Digital J: Digital J
+    DoBaDAM: DoBaDAM
+    Dogma: Dogma
+    D☆Collection: D☆Collection
+    E-BODY: E-BODY
+    EDEA: EDEA
+    EROS HEARTS: EROS HEARTS
+    EROTICA: EROTICA
+    FACE: FACE
+    FAIR＆WAY: FAIR＆WAY
+    FALENO: FALENO
+    FALENO TUBE: FALENO TUBE
+    FETISH WORLD: FETISH WORLD
+    FS.KnightsVisual: FS.KnightsVisual
+    Fantasista: Fantasista
+    First Love: First Love
+    First Star: First Star
+    Fitch: Fitch
+    Flower: Flower
+    F＆A: F＆A
+    G-AREA: G-AREA
+    GALLOP: GALLOP
+    GARCON: GARCON
+    GARDEN: GARDEN
+    GENEKI: GENEKI
+    GIGA: GIGA
+    GIRL’S CH: GIRL’S CH
+    GLAY’z IMPACT: GLAY’z IMPACT
+    GOGO！！ AV: GOGO！！ AV
+    GOS: GOS
+    GOT: GOT
+    GRAPHIS: GRAPHIS
+    GRAVISION: GRAVISION
+    GUTS: GUTS
+    Gachinco: Gachinco
+    Glory Quest: Glory Quest
+    HERO: HERO
+    HGG: HGG
+    HHH: HHH
+    HMJM: HMJM
+    HND: HND
+    HRC: HRC
+    Hanako: Hanako
+    Hapiness Holic: Hapiness Holic
+    Heydouga: Heydouga
+    High Grade: High Grade
+    Hime.STYLE: Hime.STYLE
+    Hsoda: Hsoda
+    Hunter: Hunter
+    HyakkinTV: HyakkinTV
+    I.B.WORKS: I.B.WORKS
     IDEA POCKET: IDEAPOCKET
     IDEAPOCKET: IDEAPOCKET
+    INDY: INDY
+    INITIUM: INITIUM
+    INTEC Inc: INTEC Inc
+    J-BOX: J-BOX
+    J-Fantasy: J-Fantasy
+    J-XROSS: J-XROSS
+    JAMS: JAMS
+    JFC: JFC
+    JUKUJO99: JUKUJO99
+    JUMP: JUMP
+    JUMP BEYOND: JUMP BEYOND
+    JVD: JVD
+    Jackson: Jackson
+    JapornXXX: JapornXXX
+    KAKUJITSU: KAKUJITSU
+    KAN KAN CLUB: KAN KAN CLUB
+    KANBi: KANBi
+    KEU: KEU
+    KI Planning: KI Planning
+    KIRAY: KIRAY
+    KMP: KMP
+    KMPVR: KMPVR
+    KMPVR-bibi-: KMPVR-bibi-
+    KOKESHI: KOKESHI
+    KUKI: KUKI
+    Kaiware: Kaiware
+    Kichu: Kichu
+    Kitsune: Kitsune
+    Kplus: Kplus
+    LADY×LADY: LADY×LADY
+    LEO: LEO
+    LUNATICS: LUNATICS
+    MAD: MAD
+    MAGNOLIA: MAGNOLIA
+    MANDALA: MANDALA
+    MARC DORCEL: MARC DORCEL
+    MARIA: MARIA
+    MARLOMEDIA: MARLOMEDIA
+    MARRION: MARRION
+    MAX-A: MAX-A
+    MAXING: MAXING
+    MBM: MBM
+    MDMA: MDMA
+    MEGAMI: MEGAMI
+    MICAELA: MICAELA
+    MILK: MILK
+    MILU VR: MILU VR
+    MOLESTIC: MOLESTIC
+    MONDELDE VR: MONDELDE VR
     MOODYZ: MOODYZ
     MOODYZ DIVA: MOODYZ
-    kawaii: kawaii
-    カワイイ: kawaii
+    MOON FORCE: MOON FORCE
+    MOTHERS ENTERTAINMENT PICTURES: MOTHERS ENTERTAINMENT PICTURES
+    MUGEN: MUGEN
+    MUTEKI: MUTEKI
     Madonna: Madonna
-    マドンナ: Madonna
-    ATTACKERS: ATTACKERS
-    アタッカーズ: ATTACKERS
-    FALENO: FALENO
-    ファレノ: FALENO
-    DAS: DAS
-    ダスッ！: DAS
-    PREMIUM: PREMIUM
-    プレミアム: PREMIUM
-    OPPAI: OPPAI
-    WANZ: WANZ
-    E-BODY: E-BODY
-    本中: HND
-    HND: HND
-    ROCKET: ROCKET
-    # Other majors
-    MAXING: MAXING
-    アリスJAPAN: ALICE JAPAN
-    ALICE JAPAN: ALICE JAPAN
-    MAX-A: MAX-A
-    h.m.p: h.m.p
-    KMP: KMP
-    ケイエムプロデュース: KMP
-    million: KMP
-    TEPPAN: TEPPAN
-    鉄板: TEPPAN
-    VENUS: VENUS
-    ヴィーナス: VENUS
-    # Chinese studios
-    麻豆傳媒映畫: 麻豆傳媒
-    麻豆传媒映画: 麻豆傳媒
-    大象传媒: 大象传媒
-    精东影业: 精东影业
-    天美传媒: 天美传媒
-    星空无限传媒: 星空无限传媒
-    蜜桃影像: 蜜桃影像
-    糖心Vlog: 糖心Vlog
-    皇家华人: 皇家华人
-    果冻传媒: 果冻传媒
-    扣扣传媒: 扣扣传媒
-    爱豆传媒: 爱豆传媒
-    兔子先生: 兔子先生
-    SWAG: SWAG
-    91制片厂: 91制片厂
-    NHAV: NHAV
-    EDEA: EDEA
-    # Fitch / Aroma / others
-    Fitch: Fitch
-    花子: Hanako
-    Hanako: Hanako
-    妄想族: Mousouzoku
+    Magic: Magic
+    Materiall: Materiall
+    Mellow Moon: Mellow Moon
+    Morning Window: Morning Window
     Mousouzoku: Mousouzoku
-  series_map: {}
-
-# Per-site scraper configuration
+    Mr.michiru: Mr.michiru
+    NAGIRA: NAGIRA
+    NEO ATLAS: NEO ATLAS
+    NEXT GROUP: NEXT GROUP
+    NEXT INNOVATION: NEXT INNOVATION
+    NHAV: NHAV
+    NIRVANA: NIRVANA
+    NON: NON
+    NTR.net: NTR.net
+    Naked Actress: Naked Actress
+    Nippon: Nippon
+    ONE MORE: ONE MORE
+    ONETIME: ONETIME
+    OPPAI: OPPAI
+    Oriental Dream: Oriental Dream
+    P-BOX VR: P-BOX VR
+    PREMIUM: PREMIUM
+    PRESTIGE: PRESTIGE
+    PRESTIGE PREMIUM: PRESTIGE PREMIUM
+    PSYCHEDELIC PUPPET: PSYCHEDELIC PUPPET
+    Pandora: Pandora
+    Pile Driver: Pile Driver
+    PileDriverZ: PileDriverZ
+    Pink Puncher: Pink Puncher
+    Precious Beauty: Precious Beauty
+    Primo: Primo
+    Queen Road: Queen Road
+    Queen8: Queen8
+    RADICAL-KMPVR-: RADICAL-KMPVR-
+    REDHOT Collection: REDHOT Collection
+    ROCKET: ROCKET
+    ROOKIE: ROOKIE
+    ROYAL: ROYAL
+    RedCat: RedCat
+    S-CUTE: S-CUTE
+    S-Cute: S-Cute
+    S.P.C: S.P.C
+    S1 NO.1 STYLE: S1 NO.1 STYLE
+    SAMURAI: SAMURAI
+    SASUKE: SASUKE
+    SEX Agent: SEX Agent
+    SEX MACHINE: SEX MACHINE
+    SHEMALE a la carte: SHEMALE a la carte
+    SHIBUYA PLUS: SHIBUYA PLUS
+    SHIGEKI: SHIGEKI
+    SID: SID
+    SIG-VR: SIG-VR
+    SILK LABO: SILK LABO
+    SILVER BIRCH: SILVER BIRCH
+    SLRVR: SLRVR
+    SOD Create: SOD Create
+    SODクリエイト: SOD Create
+    SODマジックミラー号: SOD Create
+    SOSORU: SOSORU
+    SOSORU×GARCON: SOSORU×GARCON
+    SPICY VR: SPICY VR
+    SPYEYE: SPYEYE
+    SSR VR: SSR VR
+    STAR PARADISE: STAR PARADISE
+    SUKEKIYO: SUKEKIYO
+    SUKESUKE: SUKESUKE
+    SUN: SUN
+    SWAG: SWAG
+    SWITCH: SWITCH
+    Samurai Porn: Samurai Porn
+    Shuffle: Shuffle
+    Sky High: Sky High
+    Soft on Demand: Soft on Demand
+    Stage 2 Media: Stage 2 Media
+    Studio TERIYAKI: Studio TERIYAKI
+    Super Model Media: Super Model Media
+    Superlative: Superlative
+    TEEN’S CANDY: TEEN’S CANDY
+    TEPPAN: TEPPAN
+    TEPPAN VR: TEPPAN VR
+    TMA: TMA
+    TMC: TMC
+    TOKIO: TOKIO
+    TRANS CLUB: TRANS CLUB
+    TRIPLE H: TRIPLE H
+    TWCC: TWCC
+    Tenshigao: Tenshigao
+    Tokyo-Hot: Tokyo-Hot
+    Tokyo247: Tokyo247
+    Tora-Tora-Tora: Tora-Tora-Tora
+    U＆K: U＆K
+    VENUS: VENUS
+    VERONICA: VERONICA
+    VIP: VIP
+    VR buz: VR buz
+    WANZ: WANZ
+    WEEKENDER: WEEKENDER
+    WOMAN: WOMAN
+    WOW！: WOW！
+    Wasabi Video: Wasabi Video
+    YOKUBO & ROYAL: YOKUBO & ROYAL
+    YONAKA: YONAKA
+    YSO: YSO
+    YUKOBO & MODEL MEDIA: YUKOBO & MODEL MEDIA
+    YUZU: YUZU
+    Yellow Duck: Yellow Duck
+    Z-MEN: Z-MEN
+    ZETTON: ZETTON
+    ZG: ZG
+    ZIZ: ZIZ
+    ZONE: ZONE
+    ZOOO: ZOOO
+    ZOOOthe100: ZOOOthe100
+    apple Club: apple Club
+    buffet: buffet
+    ex: ex
+    fermata: fermata
+    grace: grace
+    h.m.p: h.m.p
+    h.m.p DORAMA: h.m.p DORAMA
+    hawaii: hawaii
+    impact: impact
+    kawaii: kawaii
+    kira☆kira: kira☆kira
+    million: KMP
+    muramura: muramura
+    new girl: new girl
+    oldman par: oldman par
+    pistil: pistil
+    silvia: silvia
+    teamZERO: teamZERO
+    the WoRLd: the WoRLd
+    type-R: type-R
+    unfinished: unfinished
+    xxx-av: xxx-av
+    あら: スケベ/HERO
+    アイデアポケット: IDEAPOCKET
+    アタッカーズ: ATTACKERS
+    アリスJAPAN: ALICE JAPAN
+    オリエンタルドリーム: Oriental Dream
+    カワイイ: kawaii
+    キャットウォーク: CATWALK
+    クリスタル映像: 水晶映像
+    ケイエムプロデュース: KMP
+    ケイ・エム・プロデュース: KMP
+    サムライポルノ: Samurai Porn
+    スカイハイ: Sky High
+    スケベ/HERO: スケベ/HERO
+    スタジオテリヤキ: Studio TERIYAKI
+    ステージ 2 メディア: Stage 2 Media
+    スーパーモデルメディア: Super Model Media
+    センタービレッジ: Centervillage
+    ダスッ！: DAS
+    トラトラトラ: Tora-Tora-Tora
+    ピンクパンチャー: Pink Puncher
+    ファレノ: FALENO
+    プレステージ: PRESTIGE
+    プレステージプレミアム: PRESTIGE PREMIUM
+    プレミアム: PREMIUM
+    マドンナ: Madonna
+    ムゲンエンターテインメント: MUGEN
+    レッドホットコレクション: REDHOT Collection
+    ヴィーナス: VENUS
+    兔子先生: 兔子先生
+    嗚呼: 嗚呼
+    大象传媒: 大象传媒
+    天美传媒: 天美传媒
+    妄想族: Mousouzoku
+    扣扣传媒: 扣扣传媒
+    星空无限传媒: 星空无限传媒
+    本中: HND
+    東京熱: Tokyo-Hot
+    果冻传媒: 果冻传媒
+    水晶映像: 水晶映像
+    爱豆传媒: 爱豆传媒
+    皇家华人: 皇家华人
+    精东影业: 精东影业
+    糖心Vlog: 糖心Vlog
+    素人: 嗚呼
+    花子: Hanako
+    蚊香社: PRESTIGE
+    蜜桃影像: 蜜桃影像
+    鉄板: TEPPAN
+    麻豆传媒映画: 麻豆傳媒
+    麻豆傳媒映畫: 麻豆傳媒
+    ＆RiBbON: ＆RiBbON
+  target: ./reorganized
+report_dir: ./appdata/reports
 sites:
-  fc2ppvdb:
-    base_url: "https://fc2ppvdb.com"
-    scrape_delay_seconds: "5-20"
-    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
-    cookies:
-      # From F12 → Application → Cookies → fc2ppvdb.com
-      age_pass: ""
-      cf_clearance: ""
-      fc2ppvdb_session: ""
-      remember_web_xxx: ""
-      stype: ""
-      XSRF-TOKEN: ""
-  javdb:
-    base_url: "https://javdb.com"
-    scrape_delay_seconds: "5-20"
-    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
-    cookies:
-      # From F12 → Application → Cookies → javdb.com
-      over18: "1"
-      _jdb_session: ""
   caribbeancom:
-    base_url: "https://www.caribbeancom.com"
-    scrape_delay_seconds: "5-20"
-    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
+    base_url: https://www.caribbeancom.com
     cookies: {}
+    scrape_delay_seconds: 5-20
+    user_agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101
+      Firefox/135.0
+  fc2ppvdb:
+    base_url: https://fc2ppvdb.com
+    cookies:
+      XSRF-TOKEN: ''
+      age_pass: ''
+      cf_clearance: ''
+      fc2ppvdb_session: ''
+      remember_web_xxx: ''
+      stype: ''
+    scrape_delay_seconds: 5-20
+    user_agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101
+      Firefox/135.0
+  javdb:
+    base_url: https://javdb.com
+    cookies:
+      _jdb_session: ''
+      over18: '1'
+    scrape_delay_seconds: 5-20
+    user_agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101
+      Firefox/135.0
