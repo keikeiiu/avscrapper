@@ -4,3 +4,5 @@ flask>=3.0
 gunicorn>=22.0
 markdown>=3.7
 defusedxml>=0.7
+beautifulsoup4>=4.12
+croniter>=2.0

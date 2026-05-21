@@ -79,59 +79,98 @@ def scrape_makers(config, dry_run=False):
     return all_makers
 
 
+def _is_real_name(name):
+    """Filter out numeric IDs and other junk that isn't a real studio name."""
+    if not name or len(name) < 2:
+        return False
+    if re.match(r'^\d+$', name):
+        return False
+    if re.match(r'^[\d\s,.\-+]+$', name):
+        return False
+    # Too generic single words
+    if name.lower() in ('av', 'vr', 'top', 'new', 'best', 'sex'):
+        return False
+    return True
+
+
+def _is_generic_name(name):
+    """Names too generic to be useful as studio mappings."""
+    generic = {'av', 'vr', 'top', 'new', 'best', 'sex', 'girl', 'man', 'hot',
+               'love', 'max', 'ace', 'one', 'two', 'big', 'fun', 'joy', 'art'}
+    return name.lower() in generic
+
+
+def _split_name_parts(text):
+    """Split a multi-name strong text into primary name + alternates.
+    '1000人斬, 1000giri' → ['1000人斬', '1000giri']"""
+    parts = [p.strip() for p in re.split(r'[,、]', text) if p.strip()]
+    return [p for p in parts if _is_real_name(p)]
+
+
 def _parse_makers_page(html, category, seen):
     """Parse javdb maker listing page. Return list of maker dicts."""
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, "html.parser")
     makers = []
 
-    # javdb maker cards: .maker-list > .item or .makers > .box
-    items = soup.select(".movie-list .item, .maker-list .item, .section .item, .box")
-    if not items:
-        items = soup.select("a[href*='/makers/']")
+    maker_links = soup.select("a[href*='/makers/']")
+    if not maker_links:
+        return makers
 
-    for item in items:
-        # Try to find the name
-        name_el = item.select_one(".video-title strong, .maker-name, strong")
-        if not name_el:
-            name_el = item.select_one("a")
-        if not name_el:
+    for link in maker_links:
+        href = link.get("href", "")
+        if not href.startswith("/makers/"):
             continue
 
-        name = name_el.get_text(strip=True)
-        if not name or len(name) < 2:
+        strong = link.select_one("strong")
+        if not strong:
             continue
 
-        # Skip duplicates and non-maker entries
-        if name in seen:
+        # Parse the strong text — may be multi-name: "蚊香社, PRESTIGE,プレステージ"
+        # May also contain bracket alts: "マドンナ(Madonna)"
+        strong_text = strong.get_text(strip=True)
+
+        # Extract bracket content as alt names BEFORE splitting
+        bracket_alts = re.findall(r'\(([^)]+)\)', strong_text)
+        bracket_alts = [b.strip() for b in bracket_alts if _is_real_name(b.strip())]
+
+        # Remove bracket text from the strong text for cleaner primary name
+        clean_text = re.sub(r'\([^)]*\)', '', strong_text).strip()
+
+        name_parts = _split_name_parts(clean_text)
+        if not name_parts:
             continue
 
-        # Try to find alternate names
-        alt_div = item.select_one(".alternate-names, .aka, .subtitle, .maker-aliases, .aliases")
-        alt_names = []
-        if alt_div:
-            alt_text = alt_div.get_text(strip=True)
-            alt_names = [n.strip() for n in re.split(r'[,/、]', alt_text) if n.strip() and n.strip() != name]
+        primary_name = name_parts[0]
+        if primary_name in seen:
+            continue
 
-        # Also check for alt text in the item
-        full_text = item.get_text(strip=True)
-        # Japanese names often have a reading in brackets
-        bracket_match = re.findall(r'\(([^)]+)\)', full_text)
-        for bm in bracket_match:
-            if bm != name and len(bm) > 1 and bm not in alt_names:
-                alt_names.append(bm)
+        # Remaining parts (after first comma) are alternate names
+        alt_names = name_parts[1:]
+
+        # Add bracket alts
+        for b in bracket_alts:
+            if b not in name_parts and b not in alt_names and b != primary_name:
+                alt_names.append(b)
+
+        # Also check full link text for additional bracket text
+        full_text = link.get_text(" ", strip=True)
+        bracket_matches = re.findall(r'\(([^)]+)\)', full_text)
+        for bm in bracket_matches:
+            bm_clean = bm.strip()
+            if _is_real_name(bm_clean) and bm_clean not in name_parts and bm_clean not in alt_names and bm_clean != primary_name:
+                alt_names.append(bm_clean)
+
+        # Deduplicate while preserving order
+        alt_names = list(dict.fromkeys(alt_names))
 
         maker_type = "uncensored" if "uncensored" in category else "censored"
-        href = None
-        link_el = item.select_one("a[href*='/makers/']") or (name_el if name_el.name == "a" else None)
-        if link_el and link_el.name == "a":
-            href = link_el.get("href", "")
 
         makers.append({
-            "name": name,
+            "name": primary_name,
             "alt_names": alt_names,
             "type": maker_type,
-            "url": urljoin("https://javdb.com", href) if href else "",
+            "url": urljoin("https://javdb.com", href),
         })
 
     return makers
@@ -142,33 +181,59 @@ def _is_japanese(text):
     return bool(re.search(r'[぀-ゟ゠-ヿ一-鿿]', text))
 
 
+def _has_english(text):
+    """Check if text contains ASCII letters (potential English name)."""
+    return bool(re.search(r'[A-Za-z]{2,}', text))
+
+
 def build_studio_map(makers):
-    """Generate studio_map from scraped makers. Maps Japanese→English names."""
+    """Generate clean studio_map from scraped makers.
+
+    Rules:
+    - Japanese name → English canonical (e.g. マドンナ → Madonna)
+    - English self-map (e.g. S1 NO.1 STYLE → S1 NO.1 STYLE) — only if not generic
+    - Alt names → canonical (e.g. 蚊香社 → PRESTIGE)
+    - Skip entries with no useful mapping (e.g. kanji-only with no English alt)
+    """
     studio_map = {}
 
     for m in makers:
         name = m["name"]
         alt_names = m.get("alt_names", [])
 
-        # If the main name is Japanese and there's an English alt, map JA→EN
-        if _is_japanese(name):
-            english_alts = [a for a in alt_names if not _is_japanese(a)]
-            if english_alts:
-                # Map Japanese name → English name
-                canonical = english_alts[0]
-                studio_map[name] = canonical
-            # Also add self-mapping for the English canonical if it exists
-            for a in alt_names:
-                if not _is_japanese(a) and a not in studio_map:
-                    studio_map[a] = a  # English name maps to itself
+        # Determine canonical: prefer English
+        canonical = None
+        if _has_english(name):
+            canonical = name
         else:
-            # English name — self-map
-            studio_map[name] = name
+            for alt in alt_names:
+                if _has_english(alt):
+                    canonical = alt
+                    break
 
-        # Map alternate names to the primary name
+        if not canonical:
+            canonical = name
+
+        # Skip if canonical is too generic OR if there's no real mapping value
+        # (Japanese-only name self-mapping isn't useful for reorganize)
+        if _is_generic_name(canonical):
+            continue
+        # Skip entries where the only mapping is self-mapping a Japanese name
+        if _is_japanese(name) and canonical == name and not alt_names:
+            continue
+
+        # Map primary name → canonical
+        if name != canonical:
+            studio_map[name] = canonical
+
+        # Map alternates → canonical
         for alt in alt_names:
-            if alt not in studio_map:
-                studio_map[alt] = name
+            if alt not in studio_map and alt != canonical:
+                studio_map[alt] = canonical
+
+        # Canonical self-map
+        if canonical not in studio_map:
+            studio_map[canonical] = canonical
 
     return studio_map
 
@@ -176,7 +241,6 @@ def build_studio_map(makers):
 def merge_studio_map(existing_map, new_map):
     """Merge new studio_map into existing, keeping user overrides."""
     merged = dict(new_map)
-    # Existing entries override auto-generated ones
     for k, v in existing_map.items():
         merged[k] = v
     return merged
