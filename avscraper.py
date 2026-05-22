@@ -15,8 +15,16 @@ Usage:
 """
 
 import sys
+import io
 import os
 import subprocess
+
+# Force UTF-8 output on Windows (avoids cp950 encoding errors with Japanese/Chinese text)
+try:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+except Exception:
+    pass
 
 # Ensure src/ is on the path
 HERE = os.path.dirname(os.path.abspath(__file__))

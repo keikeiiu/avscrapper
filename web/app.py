@@ -1,6 +1,14 @@
 """AV Scraper Web GUI — Flask application."""
 import os
 import sys
+import io
+
+# Force UTF-8 output on Windows
+try:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+except Exception:
+    pass
 import json
 import time
 import shutil
