@@ -301,7 +301,7 @@ def get_flagged(conn, source=None):
 
 
 import os as _os
-VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v", ".asf", ".wmv"}
+VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v", ".asf", ".wmv", ".vob", ".iso", ".m2ts"}
 
 
 def find_directories(targets, id_extractor):

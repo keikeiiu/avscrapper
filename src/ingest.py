@@ -14,7 +14,7 @@ import shutil
 import argparse
 import yaml
 
-VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v", ".asf", ".wmv"}
+VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v", ".asf", ".wmv", ".vob", ".iso", ".m2ts"}
 FC2_RE = re.compile(r'FC2[ -]?PPV[ -]?(\d{6,8})', re.IGNORECASE)
 JAV_RE = re.compile(r'\b([A-Z]{2,6}[ -]?\d{2,5})', re.IGNORECASE)
 UNCENSORED_RE = re.compile(r'\b(\d{6}[-_]\d{3,4})\b')
