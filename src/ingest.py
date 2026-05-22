@@ -7,11 +7,12 @@ import shutil
 import argparse
 import yaml
 
-VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v"}
+VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v", ".asf", ".wmv"}
 FC2_RE = re.compile(r'FC2[ -]?PPV[ -]?(\d{6,8})', re.IGNORECASE)
-JAV_RE = re.compile(r'\b([A-Z]{2,6}[ -]?\d{2,5})\b')
+JAV_RE = re.compile(r'\b([A-Z]{2,6}[ -]?\d{2,5})', re.IGNORECASE)
 UNCENSORED_RE = re.compile(r'\b(\d{6}[-_]\d{3,4})\b')
 PART_RE = re.compile(r'[-_ ](?:part\s*|pt\s*|cd\s*|dvd\s*|disk\s*|disc\s*)(\d+)\b', re.IGNORECASE)
+CHINESE_SUB_RE = re.compile(r'[-_]C(?:[-_]|$)', re.IGNORECASE)
 
 # Uncensored site mapping: CID pattern → site name
 UNCENSORED_SITES = {
@@ -145,37 +146,112 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     init_db(db_path)
     conn = connect(db_path)
 
-    files = [f for f in os.listdir(source) if os.path.splitext(f)[1].lower() in VIDEO_EXTS]
-    files.sort()
+    # Collect video files: top-level + one level of subdirectories
+    scan_files = []  # (filename, folder_context)
+    for entry in os.listdir(source):
+        entry_path = os.path.join(source, entry)
+        if os.path.isfile(entry_path):
+            ext = os.path.splitext(entry)[1].lower()
+            if ext in VIDEO_EXTS:
+                scan_files.append((entry, None))
+        elif os.path.isdir(entry_path):
+            # Walk one level: pick up video files inside subdirectories
+            try:
+                for sub in os.listdir(entry_path):
+                    sub_path = os.path.join(entry_path, sub)
+                    if os.path.isfile(sub_path):
+                        ext = os.path.splitext(sub)[1].lower()
+                        if ext in VIDEO_EXTS:
+                            scan_files.append((sub, entry))  # folder context = parent dir name
+            except OSError:
+                pass
 
-    if not files:
+    if not scan_files:
         print(f"No video files found in {source}")
         conn.close()
         return
 
+    # Prefer higher-quality formats: MKV > MP4 > AVI > MOV > rest
+    _EXT_PRIORITY = {'.mkv': 0, '.mp4': 1, '.avi': 2, '.mov': 3}
+    scan_files.sort(key=lambda x: (_EXT_PRIORITY.get(os.path.splitext(x[0])[1].lower(), 9), x[0]))
+
+    # Track accompanying files: same stem as a video file, different extension
+    _NON_VIDEO_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.nfo', '.srt', '.ass', '.ssa', '.sub', '.txt', '.url'}
+    def _find_accompanying(video_fname, src_dir):
+        """Find files in src_dir with same stem as video, non-video extensions."""
+        stem = os.path.splitext(video_fname)[0].lower()
+        acc = []
+        try:
+            for f in os.listdir(src_dir):
+                if os.path.isfile(os.path.join(src_dir, f)):
+                    f_stem, f_ext = os.path.splitext(f)
+                    f_stem_lower = f_stem.lower()
+                    # Match same stem, or stem+a suffix (cover variant)
+                    if (f_stem_lower == stem or f_stem_lower == stem + 'a') and f_ext.lower() in _NON_VIDEO_EXTS:
+                        acc.append(f)
+        except OSError:
+            pass
+        return acc
+
     results = []
-    for fname in files:
+    for fname, folder in scan_files:
+        # Try CID detection from filename and also from folder name as fallback
         info = detect_type(fname)
+        if not info and folder:
+            info = detect_type(folder)
+
         if info:
             vtype, cid, site, part = info
             ext = os.path.splitext(fname)[1].lower()
+            # Detect -C suffix (Chinese subtitled) in filename or folder name
+            stem = os.path.splitext(fname)[0].upper()
+            folder_upper = (folder or "").upper()
+            chinese_sub = stem.endswith("-C") or folder_upper.endswith("-C")
             results.append({
                 "original": fname,
+                "original_folder": folder,
                 "type": vtype,
                 "cid": cid,
                 "site": site,
                 "part": part,
                 "ext": ext,
                 "auto_part": False,
+                "chinese_sub": chinese_sub,
             })
         else:
             results.append({
                 "original": fname,
+                "original_folder": folder,
                 "type": None,
                 "cid": None,
                 "part": 1,
                 "ext": os.path.splitext(fname)[1].lower(),
             })
+
+    # Deduplicate: same CID in multiple formats → keep best format, discard rest
+    _EXT_PRIORITY = {'.mkv': 0, '.mp4': 1, '.avi': 2, '.mov': 3, '.asf': 4}
+    _seen_cids = {}
+    _dedup_discard = set()
+    for i, r in enumerate(results):
+        if not r.get("type") or not r.get("cid"):
+            continue
+        key = (r["type"], r["cid"])
+        ext = r.get("ext", "")
+        prio = _EXT_PRIORITY.get(ext, 9)
+        if key in _seen_cids:
+            prev_idx, prev_prio = _seen_cids[key]
+            if prio < prev_prio:
+                # Current is better, discard previous
+                _dedup_discard.add(prev_idx)
+                _seen_cids[key] = (i, prio)
+            else:
+                # Previous is better, discard current
+                _dedup_discard.add(i)
+        else:
+            _seen_cids[key] = (i, prio)
+    # Remove discarded entries from results
+    if _dedup_discard:
+        results = [r for i, r in enumerate(results) if i not in _dedup_discard]
 
     # Auto-assign part numbers for duplicate CIDs without explicit markers
     _assign_parts(results)
@@ -219,10 +295,12 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     # Print summary
     fc2_count = sum(1 for r in results if r["type"] == "fc2")
     jav_count = sum(1 for r in results if r["type"] == "jav")
-    print(f"Found {len(files)} files in {source}")
+    print(f"Found {len(scan_files)} files in {source}")
     parts = []
     if fc2_count: parts.append(f"{fc2_count} FC2")
     if jav_count: parts.append(f"{jav_count} JAV")
+    unc_count = sum(1 for r in results if r["type"] == "uncensored")
+    if unc_count: parts.append(f"{unc_count} uncensored")
     type_str = " + ".join(parts) if parts else "?"
     print(f"  {to_move} to move ({type_str}), {to_skip} skip, {to_unknown} unknown")
 
@@ -305,9 +383,19 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         dest_dir = os.path.join(target_base, folder)
         dest_path = os.path.join(dest_dir, clean_filename(r))
 
-        src_path = os.path.join(source, r["original"])
+        if r.get("original_folder"):
+            src_path = os.path.join(source, r["original_folder"], r["original"])
+        else:
+            src_path = os.path.join(source, r["original"])
+        src_dir = os.path.join(source, r["original_folder"]) if r.get("original_folder") else source
         os.makedirs(dest_dir, exist_ok=True)
         shutil.move(src_path, dest_path)
+        # Move accompanying files (same stem, non-video: .jpg covers, .nfo, .srt, etc.)
+        for acc_file in _find_accompanying(r["original"], src_dir):
+            try:
+                shutil.move(os.path.join(src_dir, acc_file), os.path.join(dest_dir, acc_file))
+            except OSError:
+                pass
 
         full_number = f"FC2-PPV-{r['cid']}" if r["type"] == "fc2" else r["cid"]
         file_size = os.path.getsize(dest_path) if os.path.exists(dest_path) else None
@@ -322,7 +410,8 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
             insert_file_uncensored(conn, r["cid"], dest_dir, dest_path, file_size, r["part"])
         else:
             insert_pending_jav(conn, r["cid"], full_number, "javdb",
-                             f"https://javdb.com/search?q={r['cid']}&f=all")
+                             f"https://javdb.com/search?q={r['cid']}&f=all",
+                             chinese_sub=1 if r.get("chinese_sub") else 0)
             upsert_file_jav(conn, r["cid"], dest_dir, dest_path, file_size, r["part"])
         moved += 1
 

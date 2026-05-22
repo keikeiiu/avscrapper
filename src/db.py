@@ -173,6 +173,11 @@ def init_db(db_path):
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
             except sqlite3.OperationalError:
                 pass
+    for col in ("chinese_sub", "leaked"):
+        try:
+            conn.execute(f"ALTER TABLE jav_entries ADD COLUMN {col} INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
     conn.close()
 
@@ -296,7 +301,7 @@ def get_flagged(conn, source=None):
 
 
 import os as _os
-VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v"}
+VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".webm", ".rmvb", ".rm", ".m4v", ".divx", ".f4v", ".asf", ".wmv"}
 
 
 def find_directories(targets, id_extractor):
@@ -341,12 +346,12 @@ def get_stats(conn):
 
 # ── JAV-specific CRUD ──
 
-def insert_pending_jav(conn, cid, full_number, source, url=None):
+def insert_pending_jav(conn, cid, full_number, source, url=None, chinese_sub=0):
     """Insert a JAV entry as pending. No-op if already exists."""
     conn.execute("""
-        INSERT OR IGNORE INTO jav_entries (cid, full_number, source, url, status)
-        VALUES (?, ?, ?, ?, 'pending')
-    """, (cid, full_number, source, url))
+        INSERT OR IGNORE INTO jav_entries (cid, full_number, source, url, status, chinese_sub)
+        VALUES (?, ?, ?, ?, 'pending', ?)
+    """, (cid, full_number, source, url, chinese_sub))
     conn.commit()
 
 
