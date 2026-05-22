@@ -153,25 +153,15 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
     init_db(db_path)
     conn = connect(db_path)
 
-    # Collect video files: top-level + one level of subdirectories
-    scan_files = []  # (filename, folder_context)
-    for entry in os.listdir(source):
-        entry_path = os.path.join(source, entry)
-        if os.path.isfile(entry_path):
-            ext = os.path.splitext(entry)[1].lower()
+    # Collect video files: walk all subdirectories
+    scan_files = []  # (filename, rel_dir)
+    for root, dirs, filenames in os.walk(source):
+        rel = os.path.relpath(root, source)
+        rel_dir = rel if rel != '.' else None
+        for fname in filenames:
+            ext = os.path.splitext(fname)[1].lower()
             if ext in VIDEO_EXTS:
-                scan_files.append((entry, None))
-        elif os.path.isdir(entry_path):
-            # Walk one level: pick up video files inside subdirectories
-            try:
-                for sub in os.listdir(entry_path):
-                    sub_path = os.path.join(entry_path, sub)
-                    if os.path.isfile(sub_path):
-                        ext = os.path.splitext(sub)[1].lower()
-                        if ext in VIDEO_EXTS:
-                            scan_files.append((sub, entry))  # folder context = parent dir name
-            except OSError:
-                pass
+                scan_files.append((fname, rel_dir))
 
     if not scan_files:
         print(f"No video files found in {source}")
@@ -201,22 +191,22 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         return acc
 
     results = []
-    for fname, folder in scan_files:
-        # Try CID detection from filename and also from folder name as fallback
+    for fname, rel_dir in scan_files:
+        # CID detection from filename (primary), then from parent folder name
         info = detect_type(fname)
-        if not info and folder:
-            info = detect_type(folder)
+        if not info and rel_dir:
+            info = detect_type(os.path.basename(rel_dir))
 
         if info:
             vtype, cid, site, part = info
             ext = os.path.splitext(fname)[1].lower()
             # Detect -C suffix (Chinese subtitled) in filename or folder name
             stem = os.path.splitext(fname)[0].upper()
-            folder_upper = (folder or "").upper()
-            chinese_sub = stem.endswith("-C") or folder_upper.endswith("-C")
+            folder_name = os.path.basename(rel_dir) if rel_dir else ""
+            chinese_sub = stem.endswith("-C") or folder_name.upper().endswith("-C")
             results.append({
                 "original": fname,
-                "original_folder": folder,
+                "original_rel_dir": rel_dir,
                 "type": vtype,
                 "cid": cid,
                 "site": site,
@@ -228,7 +218,7 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         else:
             results.append({
                 "original": fname,
-                "original_folder": folder,
+                "original_rel_dir": rel_dir,
                 "type": None,
                 "cid": None,
                 "part": 1,
@@ -390,11 +380,8 @@ def ingest(source, fc2_target, jav_target, db_path, dry_run=False, scrape=False,
         dest_dir = os.path.join(target_base, folder)
         dest_path = os.path.join(dest_dir, clean_filename(r))
 
-        if r.get("original_folder"):
-            src_path = os.path.join(source, r["original_folder"], r["original"])
-        else:
-            src_path = os.path.join(source, r["original"])
-        src_dir = os.path.join(source, r["original_folder"]) if r.get("original_folder") else source
+        src_dir = os.path.join(source, r["original_rel_dir"]) if r.get("original_rel_dir") else source
+        src_path = os.path.join(src_dir, r["original"])
         os.makedirs(dest_dir, exist_ok=True)
         shutil.move(src_path, dest_path)
         # Move accompanying files (same stem, non-video: .jpg covers, .nfo, .srt, etc.)
